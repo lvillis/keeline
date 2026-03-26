@@ -2,6 +2,22 @@
 name = "keeline"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.94"
+description = "Metadata-driven CLI for validating, rendering, and releasing Debian-based runtime container images."
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/lvillis/keeline"
+homepage = "https://github.com/lvillis/keeline"
+documentation = "https://docs.rs/keeline"
+keywords = ["docker", "ghcr", "oci", "images", "containers"]
+categories = ["command-line-utilities", "development-tools"]
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "src/**",
+    "tests/**",
+]
 
 [dependencies]
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
@@ -11,3 +27,26 @@ serde = { version = "1.0.228", default-features = false, features = ["derive", "
 serde_json = { version = "1.0.149", default-features = false, features = ["std"] }
 toml = { version = "1.1.0", default-features = false, features = ["parse", "serde", "std"] }
 walkdir = { version = "2.5.0", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "z"
+panic = "abort"
+strip = "symbols"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[package.metadata.release]
+push = true
+publish = true
+verify = true
+sign-commit = true
+sign-tag = true
+allow-branch = ["main"]
+tag-prefix = ""
+tag-name = "{{prefix}}{{version}}"
+tag-message = "chore: release {{crate_name}} version {{version}}"
+pre-release-commit-message = "chore: release {{crate_name}} version {{version}}"
+pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{version}}" ]
