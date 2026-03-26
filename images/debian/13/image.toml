@@ -1,0 +1,28 @@
+schema = 1
+family = "debian"
+line = "13"
+version = "13"
+distro = "trixie"
+id = "debian-13"
+package = "keeline-debian"
+platforms = ["linux/amd64", "linux/arm64"]
+
+[[variants]]
+name = "default"
+dockerfile = "Dockerfile"
+base_image = "debian:13"
+title = "Keeline Debian 13"
+description = "Keeline Debian 13 (trixie) base image"
+command = ["bash"]
+canonical = ["13"]
+alias = ["trixie"]
+
+[[variants]]
+name = "slim"
+dockerfile = "slim.Dockerfile"
+base_image = "debian:13-slim"
+title = "Keeline Debian 13 Slim"
+description = "Keeline Debian 13 (trixie) slim base image"
+command = ["bash"]
+canonical = ["13-slim"]
+alias = ["trixie-slim"]

@@ -1,0 +1,48 @@
+schema = 1
+family = "jdk"
+line = "21"
+version = "21.0.10"
+distro = "trixie"
+id = "jdk-21-trixie"
+package = "keeline-jdk"
+platforms = ["linux/amd64", "linux/arm64"]
+
+[source]
+provider = "adoptium-temurin"
+release = "jdk-21.0.10+7"
+gpg_key = "3B04D753C9050D9A5D343F39843C48A565F8F04B"
+
+[[source.archives]]
+platform = "linux/amd64"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz"
+sha256 = "ea3b9bd464d6dd253e9a7accf59f7ccd2a36e4aa69640b7251e3370caef896a4"
+
+[[source.archives]]
+platform = "linux/arm64"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.10_7.tar.gz"
+sha256 = "357fee29fb0d5c079f6730db98b28942df13a6eed426f6c61cd4ad703ab27b9a"
+
+[java]
+java_home = "/opt/java/openjdk"
+builder_packages = ["ca-certificates", "gnupg", "wget"]
+runtime_packages = ["binutils", "ca-certificates", "fontconfig", "locales", "p11-kit", "tzdata"]
+verify_commands = ["java -Xshare:dump", "java -version", "javac --version"]
+trim_files = ["lib/src.zip"]
+
+[[variants]]
+name = "default"
+dockerfile = "Dockerfile"
+base_image = "debian:13"
+title = "Keeline JDK 21 Trixie"
+description = "Keeline JDK 21.0.10 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs"
+command = ["jshell"]
+canonical = ["21-trixie", "21.0.10-trixie"]
+
+[[variants]]
+name = "slim"
+dockerfile = "slim.Dockerfile"
+base_image = "debian:13-slim"
+title = "Keeline JDK 21 Trixie Slim"
+description = "Keeline JDK 21.0.10 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs"
+command = ["jshell"]
+canonical = ["21-trixie-slim", "21.0.10-trixie-slim"]
