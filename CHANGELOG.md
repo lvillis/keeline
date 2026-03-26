@@ -1,3 +1,8 @@
+## [0.1.3] - 2026-03-26
+
+### ⚙️ Miscellaneous Tasks
+
+- Upgrade bundled salus to 0.1.6
 ## [0.1.2] - 2026-03-26
 
 ### 🚀 Features
@@ -8,6 +13,10 @@
 ### 🚜 Refactor
 
 - Use fully qualified Docker Hub base image references
+
+### ⚙️ Miscellaneous Tasks
+
+- Release keeline version 0.1.2
 ## [0.1.1] - 2026-03-26
 
 ### ⚙️ Miscellaneous Tasks
