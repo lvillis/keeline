@@ -75,84 +75,20 @@ RUN set -eux; \
     chmod 0755 /out/salus; \
     rm -rf /tmp/artifact /tmp/archive.tar.gz
 
-FROM docker.io/library/debian:13-slim AS source
+FROM scratch
 
-ENV JAVA_HOME=/opt/java/openjdk
-ENV JAVA_RELEASE=jdk8u372-b07
-
-RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        gnupg \
-        wget \
-    ; \
-    rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
-    ARCH="$(dpkg --print-architecture)"; \
-    case "${ARCH}" in \
-        amd64) \
-            ESUM='78a0b3547d6f3d46227f2ad8c774248425f20f1cd63f399b713f0cdde2cc376c'; \
-            BINARY_URL='https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz'; \
-            ;; \
-        arm64) \
-            ESUM='195808eb42ab73535c84de05188914a52a47c1ac784e4bf66de95fe1fd315a5a'; \
-            BINARY_URL='https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz'; \
-            ;; \
-        *) \
-            echo "Unsupported arch: ${ARCH}"; \
-            exit 1; \
-            ;; \
-    esac; \
-    wget --progress=dot:giga -O /tmp/openjdk.tar.gz "${BINARY_URL}"; \
-    wget --progress=dot:giga -O /tmp/openjdk.tar.gz.sig "${BINARY_URL}.sig"; \
-    export GNUPGHOME="$(mktemp -d)"; \
-    gpg --batch --keyserver keyserver.ubuntu.com --recv-keys '3B04D753C9050D9A5D343F39843C48A565F8F04B'; \
-    gpg --batch --verify /tmp/openjdk.tar.gz.sig /tmp/openjdk.tar.gz; \
-    rm -rf "${GNUPGHOME}" /tmp/openjdk.tar.gz.sig; \
-    echo "${ESUM} */tmp/openjdk.tar.gz" | sha256sum -c -; \
-    mkdir -p "$JAVA_HOME"; \
-    tar --extract --file /tmp/openjdk.tar.gz --directory "$JAVA_HOME" --strip-components 1 --no-same-owner; \
-    rm -f /tmp/openjdk.tar.gz $JAVA_HOME/src.zip;
-
-FROM docker.io/library/debian:13-slim
-
-ENV JAVA_HOME=/opt/java/openjdk
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
-ENV LANG="C.UTF-8"
-ENV LANGUAGE="C.UTF-8"
-ENV LC_ALL="C.UTF-8"
-
-RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        binutils \
-        ca-certificates \
-        tzdata \
-    ; \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=source /opt/java/openjdk /opt/java/openjdk
 COPY --from=init /out/tino /sbin/tino
 COPY --from=healthcheck /out/salus /bin/salus
-
-RUN set -eux; \
-    find "$JAVA_HOME/lib" -name '*.so' -exec dirname '{}' ';' | sort -u > /etc/ld.so.conf.d/docker-openjdk.conf; \
-    ldconfig; \
-    java -Xshare:dump; \
-    java -version; \
-    javac -version
 
 ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
 ARG KEELINE_IMAGE_REVISION=unknown
 ARG KEELINE_IMAGE_LICENSES=Apache-2.0
-LABEL org.opencontainers.image.title="Keeline JDK 8u372 Trixie Slim" \
-      org.opencontainers.image.description="Keeline JDK 8u372 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs" \
+LABEL org.opencontainers.image.title="Keeline Scratch 1" \
+      org.opencontainers.image.description="Keeline scratch base image with tino and salus" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \
       org.opencontainers.image.revision="${KEELINE_IMAGE_REVISION}" \
       org.opencontainers.image.licenses="${KEELINE_IMAGE_LICENSES}" \
-      org.opencontainers.image.version="8u372"
+      org.opencontainers.image.version="1"
 
 ENTRYPOINT ["/sbin/tino","-g","-s","--"]
-CMD ["sh"]
+CMD ["/bin/salus","--version"]

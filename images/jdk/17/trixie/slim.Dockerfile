@@ -5,7 +5,7 @@
 
 FROM docker.io/library/debian:13-slim AS init
 
-ENV TINO_RELEASE=0.1.15
+ENV TINO_RELEASE=0.1.16
 
 RUN set -eux; \
     apt-get update; \
@@ -19,12 +19,12 @@ RUN set -eux; \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
         amd64) \
-            ESUM='4dc414d63bcc589a7c2f49e11004ba7ace0ea2a3c055df3bfd5c6406bb3b4444'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-x86_64-unknown-linux-musl.tar.gz'; \
+            ESUM='b4b3414c417c7859652463e25e288843f61fd2f4bfbe23b115589be033a922e6'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-x86_64-musl.tar.gz'; \
             ;; \
         arm64) \
-            ESUM='a394b7c9356d6a99620e90a1e28aecca35799573a73093ed57405170d25c8584'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-aarch64-unknown-linux-musl.tar.gz'; \
+            ESUM='a53821da990cae1bd5f5ea9620d731fd1b607c9224433411f360b37f604c5c4b'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-aarch64-musl.tar.gz'; \
             ;; \
         *) \
             echo "Unsupported arch: ${ARCH}"; \

@@ -110,6 +110,8 @@ pub struct RawVariant {
     pub name: String,
     pub dockerfile: String,
     pub base_image: String,
+    #[serde(default)]
+    pub builder_image: Option<String>,
     pub title: String,
     pub description: String,
     #[serde(default)]
@@ -195,6 +197,7 @@ pub struct ImageTarget {
     pub dockerfile: PathBuf,
     pub platforms: Vec<String>,
     pub base_image: String,
+    pub builder_image: Option<String>,
     pub title: String,
     pub description: String,
     pub command: Vec<String>,
@@ -365,6 +368,7 @@ mod tests {
             dockerfile: "images/jdk/21/trixie/Dockerfile".into(),
             platforms: vec!["linux/amd64".to_string()],
             base_image: "docker.io/library/debian:13".to_string(),
+            builder_image: None,
             title: "Sample".to_string(),
             description: "Sample image".to_string(),
             command: vec!["jshell".to_string()],

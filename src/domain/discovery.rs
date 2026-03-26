@@ -130,6 +130,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 dockerfile: context_dir.join(variant.dockerfile),
                 platforms: definition.platforms.clone(),
                 base_image: variant.base_image,
+                builder_image: variant.builder_image,
                 title: variant.title,
                 description: variant.description,
                 command: variant.command,

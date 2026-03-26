@@ -27,7 +27,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
 
     let package_pattern = Regex::new(r"^keeline-[a-z0-9-]+$")?;
     let family_pattern = Regex::new(r"^[a-z0-9]+$")?;
-    let base_image_pattern = Regex::new(r"^[a-z0-9./_-]+:[A-Za-z0-9._-]+$")?;
+    let image_reference_pattern = Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+)$")?;
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
@@ -83,11 +83,19 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             target.id
         );
         ensure!(
-            base_image_pattern.is_match(&target.base_image),
+            image_reference_pattern.is_match(&target.base_image),
             "image `{}` declares invalid base image `{}`",
             target.id,
             target.base_image
         );
+        if let Some(builder_image) = &target.builder_image {
+            ensure!(
+                image_reference_pattern.is_match(builder_image),
+                "image `{}` declares invalid builder image `{}`",
+                target.id,
+                builder_image
+            );
+        }
         ensure!(
             !target.title.trim().is_empty(),
             "image `{}` must declare a title",
@@ -118,6 +126,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
         match target.family.as_str() {
             "debian" => validate_debian_target(target)?,
             "jdk" => validate_jdk_target(target, &sha256_pattern)?,
+            "scratch" => validate_scratch_target(target)?,
             _ => {
                 ensure!(
                     target.source.is_none(),
@@ -150,6 +159,31 @@ fn validate_debian_target(target: &ImageTarget) -> Result<()> {
     ensure!(
         target.java.is_none(),
         "debian image `{}` must not declare java runtime metadata",
+        target.id
+    );
+
+    Ok(())
+}
+
+fn validate_scratch_target(target: &ImageTarget) -> Result<()> {
+    ensure!(
+        target.source.is_none(),
+        "scratch image `{}` must not declare an upstream source",
+        target.id
+    );
+    ensure!(
+        target.java.is_none(),
+        "scratch image `{}` must not declare java runtime metadata",
+        target.id
+    );
+    ensure!(
+        target.base_image == "scratch",
+        "scratch image `{}` must use base image `scratch`",
+        target.id
+    );
+    ensure!(
+        target.builder_image.is_some(),
+        "scratch image `{}` must declare a builder image",
         target.id
     );
 
@@ -542,6 +576,7 @@ mod tests {
             dockerfile: "images/sample/Dockerfile".into(),
             platforms: vec!["linux/amd64".to_string()],
             base_image: "docker.io/library/debian:13".to_string(),
+            builder_image: None,
             title: "Sample".to_string(),
             description: "Sample image".to_string(),
             command: vec!["bash".to_string()],

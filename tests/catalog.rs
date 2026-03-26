@@ -8,7 +8,7 @@ use keeline::render;
 #[test]
 fn discovers_expected_image_targets() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
-    assert_eq!(catalog.targets.len(), 8);
+    assert_eq!(catalog.targets.len(), 9);
 }
 
 #[test]
@@ -45,9 +45,11 @@ fn rendered_images_include_tino_entrypoint() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
     let debian = catalog.target("debian-13").unwrap();
     let jdk = catalog.target("jdk-21-trixie").unwrap();
+    let scratch = catalog.target("scratch-1").unwrap();
 
     let debian_rendered = render::render(debian).unwrap();
     let jdk_rendered = render::render(jdk).unwrap();
+    let scratch_rendered = render::render(scratch).unwrap();
 
     assert!(debian_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
     assert!(debian_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
@@ -59,6 +61,10 @@ fn rendered_images_include_tino_entrypoint() {
         jdk_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
             > jdk_rendered.find("    javac --version\n\n").unwrap()
     );
+    assert!(scratch_rendered.contains("FROM scratch"));
+    assert!(scratch_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
+    assert!(scratch_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
+    assert!(scratch_rendered.contains("CMD [\"/bin/salus\",\"--version\"]"));
 }
 
 #[test]
@@ -100,7 +106,7 @@ platforms = ["linux/amd64"]
 
 [init]
 provider = "tino"
-release = "0.1.15"
+release = "0.1.16"
 binary_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 

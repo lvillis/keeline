@@ -36,6 +36,7 @@ pub fn render(target: &ImageTarget) -> Result<String> {
     match target.family.as_str() {
         "debian" => render_debian(target),
         "jdk" => render_jdk(target),
+        "scratch" => render_scratch(target),
         family => bail!("rendering is not implemented for family `{family}`"),
     }
 }
@@ -117,7 +118,7 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
     let mut output = String::new();
     let command = serde_json::to_string(&target.command)?;
     let entrypoint = serde_json::to_string(&init.entrypoint)?;
-    let builder_image = builder_image(&target.base_image);
+    let builder_image = effective_builder_image(target);
 
     output.push_str(GENERATED_HEADER);
     append_binary_stage(
@@ -187,7 +188,7 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
         .java
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("jdk image `{}` is missing java metadata", target.id))?;
-    let builder_image = builder_image(&target.base_image);
+    let builder_image = effective_builder_image(target);
     let command = serde_json::to_string(&target.command)?;
     let trim_paths: Vec<String> = java
         .trim_files
@@ -322,6 +323,71 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
     Ok(output)
 }
 
+fn render_scratch(target: &ImageTarget) -> Result<String> {
+    let init = target
+        .init
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("image `{}` is missing init metadata", target.id))?;
+    let healthcheck = target
+        .healthcheck
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("image `{}` is missing healthcheck metadata", target.id))?;
+    let mut output = String::new();
+    let command = serde_json::to_string(&target.command)?;
+    let entrypoint = serde_json::to_string(&init.entrypoint)?;
+    let builder_image = effective_builder_image(target);
+
+    output.push_str(GENERATED_HEADER);
+    append_binary_stage(
+        &mut output,
+        BinaryStageSpec {
+            stage_name: "init",
+            release_var_name: "TINO_RELEASE",
+            release: init.release.as_str(),
+            binary_path: init.binary_path.as_str(),
+            install_packages: &init.install_packages,
+            strip_components: init.strip_components,
+            archives: &init.archives,
+            builder_image: &builder_image,
+        },
+    )?;
+    append_binary_stage(
+        &mut output,
+        BinaryStageSpec {
+            stage_name: "healthcheck",
+            release_var_name: "SALUS_RELEASE",
+            release: healthcheck.release.as_str(),
+            binary_path: healthcheck.binary_path.as_str(),
+            install_packages: &healthcheck.install_packages,
+            strip_components: healthcheck.strip_components,
+            archives: &healthcheck.archives,
+            builder_image: &builder_image,
+        },
+    )?;
+    writeln!(output, "FROM {}", target.base_image)?;
+    writeln!(output)?;
+    writeln!(
+        output,
+        "COPY --from=init /out/{} {}",
+        archive_binary_name(&init.binary_path)?,
+        init.binary_path
+    )?;
+    writeln!(
+        output,
+        "COPY --from=healthcheck /out/{} {}",
+        archive_binary_name(&healthcheck.binary_path)?,
+        healthcheck.binary_path
+    )?;
+    writeln!(output)?;
+    append_label_args(&mut output)?;
+    append_common_labels(&mut output, target)?;
+    output.push('\n');
+    writeln!(output, "ENTRYPOINT {entrypoint}")?;
+    writeln!(output, "CMD {command}")?;
+
+    Ok(output)
+}
+
 fn append_binary_stage(output: &mut String, spec: BinaryStageSpec<'_>) -> Result<()> {
     let case_statement = render_archive_case_statement(spec.archives)?;
     let archive_name = archive_binary_name(spec.binary_path)?;
@@ -444,7 +510,7 @@ fn dpkg_arch_for_platform(platform: &str) -> Result<&'static str> {
     }
 }
 
-fn builder_image(base_image: &str) -> String {
+fn default_builder_image(base_image: &str) -> String {
     if let Some((repository, tag)) = split_image_reference(base_image)
         && matches!(
             repository,
@@ -459,6 +525,13 @@ fn builder_image(base_image: &str) -> String {
     }
 
     base_image.to_string()
+}
+
+fn effective_builder_image(target: &ImageTarget) -> String {
+    target
+        .builder_image
+        .clone()
+        .unwrap_or_else(|| default_builder_image(&target.base_image))
 }
 
 fn split_image_reference(reference: &str) -> Option<(&str, &str)> {
@@ -500,7 +573,7 @@ fn shell_quote(value: &str) -> String {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{builder_image, normalize_trim_path, render};
+    use super::{default_builder_image, normalize_trim_path, render};
     use crate::domain::{
         HealthcheckRuntime, ImageStatus, ImageTarget, InitRuntime, JavaRuntime, SourceArchive,
     };
@@ -508,11 +581,11 @@ mod tests {
     #[test]
     fn derives_slim_builder_image_from_full_debian_base() {
         assert_eq!(
-            builder_image("docker.io/library/debian:13"),
+            default_builder_image("docker.io/library/debian:13"),
             "docker.io/library/debian:13-slim"
         );
         assert_eq!(
-            builder_image("docker.io/library/debian:13-slim"),
+            default_builder_image("docker.io/library/debian:13-slim"),
             "docker.io/library/debian:13-slim"
         );
     }
@@ -540,6 +613,7 @@ mod tests {
             dockerfile: PathBuf::from("images/jdk/21/trixie/Dockerfile"),
             platforms: vec!["linux/amd64".to_string()],
             base_image: "docker.io/library/debian:13".to_string(),
+            builder_image: None,
             title: "Keeline JDK 21 Trixie".to_string(),
             description: "Keeline JDK 21.0.10 on Debian 13 (trixie)".to_string(),
             command: vec!["jshell".to_string()],
@@ -547,7 +621,7 @@ mod tests {
             alias_tags: vec![],
             init: Some(InitRuntime {
                 provider: "tino".to_string(),
-                release: "0.1.15".to_string(),
+                release: "0.1.16".to_string(),
                 binary_path: "/sbin/tino".to_string(),
                 install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
                 strip_components: 1,

@@ -6,6 +6,7 @@ Rust CLI.
 - `images/debian/<debian-major>/` stores Debian base image contexts.
 - `images/jdk/<jdk-major>/<debian-line>/` stores JDK image contexts on a
   Debian line.
+- `images/scratch/<image-line>/` stores scratch-based tool image contexts.
 - Each image context must include an `image.toml`. That file defines package
   metadata, tags, upstream tarballs, checksums, variant settings, and release
   state.

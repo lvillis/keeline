@@ -1,8 +1,8 @@
 # Keeline
 
-Keeline provides Debian-based runtime images published to GHCR, with `tino`
-integrated as the default PID 1 init process and `salus` bundled for health
-checks across the image line.
+Keeline provides Debian-based runtime images and a minimal scratch tool image
+published to GHCR, with `tino` integrated as the default PID 1 init process
+and `salus` bundled for health checks across the image line.
 
 ## Images
 
@@ -10,6 +10,7 @@ Current image packages:
 
 - `ghcr.io/lvillis/keeline-debian`
 - `ghcr.io/lvillis/keeline-jdk`
+- `ghcr.io/lvillis/keeline-scratch`
 
 Current published image lines:
 
@@ -21,6 +22,7 @@ Current published image lines:
 - `ghcr.io/lvillis/keeline-jdk:21-trixie-slim`
 - `ghcr.io/lvillis/keeline-jdk:8u372-trixie`
 - `ghcr.io/lvillis/keeline-jdk:8u372-trixie-slim`
+- `ghcr.io/lvillis/keeline-scratch:1`
 
 ## Tag Rules
 
@@ -28,6 +30,7 @@ Current published image lines:
 - Image tags express version and variant.
 - Debian tags use forms like `13` and `13-slim`.
 - JDK tags use forms like `21-trixie`, `21.0.10-trixie`, `8u372-trixie`, and `8u372-trixie-slim`.
+- Scratch tags currently use `1`.
 - `latest` is not published.
 
 ## Usage
@@ -38,6 +41,7 @@ Examples:
 docker pull ghcr.io/lvillis/keeline-debian:13
 docker pull ghcr.io/lvillis/keeline-jdk:21-trixie
 docker pull ghcr.io/lvillis/keeline-jdk:8u372-trixie
+docker pull ghcr.io/lvillis/keeline-scratch:1
 ```
 
 For strongly reproducible deployments, pin by digest.
@@ -46,6 +50,7 @@ For strongly reproducible deployments, pin by digest.
 
 - Debian images provide a clean Debian 13 base.
 - JDK images provide Debian 13 based Java runtimes built for stable consumption.
+- Scratch images provide a minimal `FROM scratch` base containing only `tino` and `salus`.
 - All images include `tino` at `/sbin/tino` and start through `ENTRYPOINT ["/sbin/tino", "-g", "-s", "--"]`.
 - All images include `salus` at `/bin/salus` for downstream `HEALTHCHECK` and Kubernetes `exec` probes.
 - JDK `slim` images reduce runtime packages and use `C.UTF-8` instead of generated `en_US.UTF-8` locales.
