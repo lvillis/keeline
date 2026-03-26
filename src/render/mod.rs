@@ -301,7 +301,10 @@ fn dpkg_arch_for_platform(platform: &str) -> Result<&'static str> {
 
 fn builder_image(base_image: &str) -> String {
     if let Some((repository, tag)) = split_image_reference(base_image) {
-        if matches!(repository, "debian" | "docker.io/debian" | "docker.io/library/debian") {
+        if matches!(
+            repository,
+            "debian" | "docker.io/debian" | "docker.io/library/debian"
+        ) {
             if tag.ends_with("-slim") {
                 return base_image.to_string();
             }

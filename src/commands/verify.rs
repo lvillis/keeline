@@ -9,9 +9,10 @@ pub fn run(catalog: &ImageCatalog, _args: &VerifyArgs) -> Result<()> {
     render::check_catalog(catalog)?;
 
     println!(
-        "validated {} image targets across {} packages and confirmed rendered dockerfiles",
+        "validated {} image targets across {} packages, with {} releasable targets, and confirmed rendered dockerfiles",
         catalog.targets.len(),
-        catalog.package_count()
+        catalog.package_count(),
+        catalog.release_target_count()
     );
 
     Ok(())

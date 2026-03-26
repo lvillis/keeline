@@ -5,6 +5,8 @@ version = "8u372"
 distro = "trixie"
 id = "jdk-8u372-trixie"
 package = "keeline-jdk"
+publish = true
+status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
 [source]

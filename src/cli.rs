@@ -38,6 +38,8 @@ pub struct ListArgs {
 pub struct MatrixArgs {
     #[arg(long)]
     pub pretty: bool,
+    #[arg(long)]
+    pub all: bool,
 }
 
 #[derive(Debug, Args)]

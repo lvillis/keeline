@@ -5,6 +5,8 @@ version = "17.0.18"
 distro = "trixie"
 id = "jdk-17-trixie"
 package = "keeline-jdk"
+publish = true
+status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
 [source]

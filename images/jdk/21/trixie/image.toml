@@ -5,6 +5,8 @@ version = "21.0.10"
 distro = "trixie"
 id = "jdk-21-trixie"
 package = "keeline-jdk"
+publish = true
+status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
 [source]

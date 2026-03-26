@@ -356,6 +356,8 @@ mod tests {
             version: "21.0.10".to_string(),
             distro: Some("trixie".to_string()),
             package: package.to_string(),
+            publish: true,
+            status: crate::domain::ImageStatus::Stable,
             variant: "default".to_string(),
             context: "images/sample".into(),
             dockerfile: "images/sample/Dockerfile".into(),

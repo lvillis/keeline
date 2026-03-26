@@ -27,6 +27,8 @@ Current published image lines:
 - Debian tags use forms like `13` and `13-slim`.
 - JDK tags use forms like `21-trixie`, `21.0.10-trixie`, `8u372-trixie`, and `8u372-trixie-slim`.
 - `latest` is not published.
+- Each `image.toml` also declares `publish` and `status`.
+- Only targets with `publish = true` and `status = "stable"` enter the default release matrix.
 
 ## Usage
 

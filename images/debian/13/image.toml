@@ -5,6 +5,8 @@ version = "13"
 distro = "trixie"
 id = "debian-13"
 package = "keeline-debian"
+publish = true
+status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
 [[variants]]

@@ -2,6 +2,14 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ImageStatus {
+    Stable,
+    Experimental,
+    Disabled,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RawImageDefinition {
     #[serde(default = "default_schema")]
@@ -13,6 +21,10 @@ pub struct RawImageDefinition {
     pub distro: Option<String>,
     pub id: String,
     pub package: String,
+    #[serde(default = "default_publish")]
+    pub publish: bool,
+    #[serde(default = "default_status")]
+    pub status: ImageStatus,
     pub platforms: Vec<String>,
     #[serde(default)]
     pub source: Option<RawSource>,
@@ -102,6 +114,8 @@ pub struct ImageTarget {
     pub version: String,
     pub distro: Option<String>,
     pub package: String,
+    pub publish: bool,
+    pub status: ImageStatus,
     pub variant: String,
     pub context: PathBuf,
     pub dockerfile: PathBuf,
@@ -145,6 +159,14 @@ impl ImageCatalog {
     pub fn target(&self, id: &str) -> Option<&ImageTarget> {
         self.targets.iter().find(|target| target.id == id)
     }
+
+    pub fn release_targets(&self) -> impl Iterator<Item = &ImageTarget> {
+        self.targets.iter().filter(|target| target.is_releasable())
+    }
+
+    pub fn release_target_count(&self) -> usize {
+        self.release_targets().count()
+    }
 }
 
 impl ImageTarget {
@@ -171,6 +193,14 @@ impl ImageTarget {
             .iter()
             .find(|archive| archive.platform == platform)
     }
+
+    pub fn is_releasable(&self) -> bool {
+        self.publish && self.status == ImageStatus::Stable
+    }
+
+    pub fn status_label(&self) -> &'static str {
+        self.status.as_str()
+    }
 }
 
 pub fn default_variant_name() -> String {
@@ -183,4 +213,75 @@ pub fn default_schema() -> u32 {
 
 pub fn default_strip_components() -> u8 {
     1
+}
+
+pub fn default_publish() -> bool {
+    true
+}
+
+pub fn default_status() -> ImageStatus {
+    ImageStatus::Stable
+}
+
+impl ImageStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Stable => "stable",
+            Self::Experimental => "experimental",
+            Self::Disabled => "disabled",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ImageCatalog, ImageStatus, ImageTarget};
+
+    fn make_target(id: &str, publish: bool, status: ImageStatus) -> ImageTarget {
+        ImageTarget {
+            schema: 1,
+            id: id.to_string(),
+            family: "jdk".to_string(),
+            line: "21".to_string(),
+            version: "21.0.10".to_string(),
+            distro: Some("trixie".to_string()),
+            package: "keeline-jdk".to_string(),
+            publish,
+            status,
+            variant: "default".to_string(),
+            context: "images/jdk/21/trixie".into(),
+            dockerfile: "images/jdk/21/trixie/Dockerfile".into(),
+            platforms: vec!["linux/amd64".to_string()],
+            base_image: "docker.io/library/debian:13".to_string(),
+            title: "Sample".to_string(),
+            description: "Sample image".to_string(),
+            command: vec!["jshell".to_string()],
+            canonical_tags: vec!["21-trixie".to_string()],
+            alias_tags: Vec::new(),
+            source: None,
+            java: None,
+            definition_file: "images/jdk/21/trixie/image.toml".into(),
+        }
+    }
+
+    #[test]
+    fn release_targets_include_only_stable_published_images() {
+        let catalog = ImageCatalog {
+            root: "images".into(),
+            targets: vec![
+                make_target("stable", true, ImageStatus::Stable),
+                make_target("experimental", true, ImageStatus::Experimental),
+                make_target("disabled", true, ImageStatus::Disabled),
+                make_target("hidden", false, ImageStatus::Stable),
+            ],
+        };
+
+        let ids: Vec<&str> = catalog
+            .release_targets()
+            .map(|target| target.id.as_str())
+            .collect();
+
+        assert_eq!(ids, vec!["stable"]);
+        assert_eq!(catalog.release_target_count(), 1);
+    }
 }

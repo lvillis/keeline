@@ -63,6 +63,8 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 version: definition.version.clone(),
                 distro: definition.distro.clone(),
                 package: definition.package.clone(),
+                publish: definition.publish,
+                status: definition.status.clone(),
                 variant: variant.name,
                 context: context_dir.to_path_buf(),
                 dockerfile: context_dir.join(variant.dockerfile),

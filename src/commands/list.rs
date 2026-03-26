@@ -17,13 +17,14 @@ pub fn run(catalog: &ImageCatalog, args: &ListArgs) -> Result<()> {
         .or_else(|| std::env::var("GITHUB_REPOSITORY_OWNER").ok())
         .unwrap_or_else(|| "<owner>".to_string());
 
-    let headers = ["ID", "GHCR", "CONTEXT"];
-    let rows: Vec<[String; 3]> = catalog
+    let headers = ["ID", "STATUS", "GHCR", "CONTEXT"];
+    let rows: Vec<[String; 4]> = catalog
         .targets
         .iter()
         .map(|target| {
             [
                 target.id.clone(),
+                render_status(target.publish, target.status_label()),
                 format!("{}:{}", target.repository(&owner), target.primary_tag()),
                 target.context.display().to_string(),
             ]
@@ -33,39 +34,58 @@ pub fn run(catalog: &ImageCatalog, args: &ListArgs) -> Result<()> {
     let widths = column_widths(&headers, &rows);
 
     println!(
-        "{:<id$}  {:<ghcr$}  {}",
+        "{:<id$}  {:<status$}  {:<ghcr$}  {}",
         headers[0],
         headers[1],
         headers[2],
+        headers[3],
         id = widths[0],
-        ghcr = widths[1],
+        status = widths[1],
+        ghcr = widths[2],
     );
     println!(
-        "{:-<id$}  {:-<ghcr$}  {:-<context$}",
+        "{:-<id$}  {:-<status$}  {:-<ghcr$}  {:-<context$}",
+        "",
         "",
         "",
         "",
         id = widths[0],
-        ghcr = widths[1],
-        context = widths[2],
+        status = widths[1],
+        ghcr = widths[2],
+        context = widths[3],
     );
 
     for row in rows {
         println!(
-            "{:<id$}  {:<ghcr$}  {}",
+            "{:<id$}  {:<status$}  {:<ghcr$}  {}",
             row[0],
             row[1],
             row[2],
+            row[3],
             id = widths[0],
-            ghcr = widths[1],
+            status = widths[1],
+            ghcr = widths[2],
         );
     }
 
     Ok(())
 }
 
-fn column_widths(headers: &[&str; 3], rows: &[[String; 3]]) -> [usize; 3] {
-    let mut widths = [headers[0].len(), headers[1].len(), headers[2].len()];
+fn render_status(publish: bool, status: &str) -> String {
+    if publish {
+        status.to_string()
+    } else {
+        format!("{status}/hidden")
+    }
+}
+
+fn column_widths(headers: &[&str; 4], rows: &[[String; 4]]) -> [usize; 4] {
+    let mut widths = [
+        headers[0].len(),
+        headers[1].len(),
+        headers[2].len(),
+        headers[3].len(),
+    ];
 
     for row in rows {
         for (index, value) in row.iter().enumerate() {
@@ -78,17 +98,24 @@ fn column_widths(headers: &[&str; 3], rows: &[[String; 3]]) -> [usize; 3] {
 
 #[cfg(test)]
 mod tests {
-    use super::column_widths;
+    use super::{column_widths, render_status};
 
     #[test]
     fn computes_widths_from_headers_and_rows() {
-        let headers = ["ID", "GHCR", "CONTEXT"];
+        let headers = ["ID", "STATUS", "GHCR", "CONTEXT"];
         let rows = vec![[
             "jdk-8u372-trixie".to_string(),
+            "stable".to_string(),
             "ghcr.io/example/keeline-jdk:8u372-trixie".to_string(),
             "images/jdk/8/trixie".to_string(),
         ]];
 
-        assert_eq!(column_widths(&headers, &rows), [16, 40, 19]);
+        assert_eq!(column_widths(&headers, &rows), [16, 6, 40, 19]);
+    }
+
+    #[test]
+    fn renders_hidden_status_label_for_unpublished_targets() {
+        assert_eq!(render_status(true, "stable"), "stable");
+        assert_eq!(render_status(false, "experimental"), "experimental/hidden");
     }
 }

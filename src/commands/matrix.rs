@@ -17,6 +17,9 @@ struct MatrixEntry<'a> {
     version: &'a str,
     distro: Option<&'a str>,
     package: &'a str,
+    publish: bool,
+    status: &'a str,
+    releasable: bool,
     context: String,
     dockerfile: String,
     base_image: &'a str,
@@ -32,6 +35,7 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
         include: catalog
             .targets
             .iter()
+            .filter(|target| args.all || target.is_releasable())
             .map(|target| MatrixEntry {
                 id: &target.id,
                 family: &target.family,
@@ -39,6 +43,9 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
                 version: &target.version,
                 distro: target.distro.as_deref(),
                 package: &target.package,
+                publish: target.publish,
+                status: target.status_label(),
+                releasable: target.is_releasable(),
                 context: target.context.display().to_string(),
                 dockerfile: target.dockerfile.display().to_string(),
                 base_image: &target.base_image,

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 
 use crate::cli::ReleaseArgs;
 use crate::commands::build_args;
@@ -10,13 +10,26 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
     catalog.validate()?;
 
     let targets: Vec<&ImageTarget> = match &args.image_id {
-        Some(image_id) => vec![
-            catalog
+        Some(image_id) => vec![{
+            let target = catalog
                 .target(image_id)
-                .with_context(|| format!("unknown image id `{image_id}`"))?,
-        ],
-        None => catalog.targets.iter().collect(),
+                .with_context(|| format!("unknown image id `{image_id}`"))?;
+            ensure!(
+                target.is_releasable(),
+                "image `{}` is not releasable: publish={}, status={}",
+                target.id,
+                target.publish,
+                target.status_label()
+            );
+            target
+        }],
+        None => catalog.release_targets().collect(),
     };
+
+    ensure!(
+        !targets.is_empty(),
+        "no releasable image targets were selected"
+    );
 
     for target in targets {
         render::sync_target(target)?;
