@@ -112,6 +112,9 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             );
         }
 
+        validate_init_runtime(target, &sha256_pattern)?;
+        validate_healthcheck_runtime(target, &sha256_pattern)?;
+
         match target.family.as_str() {
             "debian" => validate_debian_target(target)?,
             "jdk" => validate_jdk_target(target, &sha256_pattern)?,
@@ -149,6 +152,158 @@ fn validate_debian_target(target: &ImageTarget) -> Result<()> {
         "debian image `{}` must not declare java runtime metadata",
         target.id
     );
+
+    Ok(())
+}
+
+fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
+    let init = target
+        .init
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("image `{}` must declare init metadata", target.id))?;
+
+    ensure!(
+        init.provider == "tino",
+        "image `{}` must use init provider `tino`",
+        target.id
+    );
+    ensure!(
+        !init.release.trim().is_empty(),
+        "image `{}` must declare an init release",
+        target.id
+    );
+    ensure!(
+        init.binary_path.starts_with('/'),
+        "image `{}` must declare an absolute init binary path",
+        target.id
+    );
+    ensure!(
+        !init.install_packages.is_empty(),
+        "image `{}` must declare init install packages",
+        target.id
+    );
+    ensure!(
+        !init.entrypoint.is_empty(),
+        "image `{}` must declare an init entrypoint",
+        target.id
+    );
+    ensure!(
+        init.entrypoint[0] == init.binary_path,
+        "image `{}` init entrypoint must start with `{}`",
+        target.id,
+        init.binary_path
+    );
+    ensure!(
+        !init.archives.is_empty(),
+        "image `{}` must declare init archives",
+        target.id
+    );
+
+    let mut seen_archives = HashSet::new();
+    for archive in &init.archives {
+        ensure!(
+            seen_archives.insert(archive.platform.clone()),
+            "image `{}` repeats init archive for platform `{}`",
+            target.id,
+            archive.platform
+        );
+        ensure!(
+            target.platforms.contains(&archive.platform),
+            "image `{}` declares init archive for unsupported platform `{}`",
+            target.id,
+            archive.platform
+        );
+        ensure!(
+            archive.url.starts_with("https://"),
+            "image `{}` init archive URL must use https: {}",
+            target.id,
+            archive.url
+        );
+        ensure!(
+            sha256_pattern.is_match(&archive.sha256),
+            "image `{}` init archive checksum is invalid for platform `{}`",
+            target.id,
+            archive.platform
+        );
+    }
+
+    for platform in &target.platforms {
+        ensure!(
+            target.init_archive_for_platform(platform).is_some(),
+            "image `{}` is missing an init archive for platform `{platform}`",
+            target.id
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_healthcheck_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
+    let healthcheck = target.healthcheck.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("image `{}` must declare healthcheck metadata", target.id)
+    })?;
+
+    ensure!(
+        healthcheck.provider == "salus",
+        "image `{}` must use healthcheck provider `salus`",
+        target.id
+    );
+    ensure!(
+        !healthcheck.release.trim().is_empty(),
+        "image `{}` must declare a healthcheck release",
+        target.id
+    );
+    ensure!(
+        healthcheck.binary_path.starts_with('/'),
+        "image `{}` must declare an absolute healthcheck binary path",
+        target.id
+    );
+    ensure!(
+        !healthcheck.install_packages.is_empty(),
+        "image `{}` must declare healthcheck install packages",
+        target.id
+    );
+    ensure!(
+        !healthcheck.archives.is_empty(),
+        "image `{}` must declare healthcheck archives",
+        target.id
+    );
+
+    let mut seen_archives = HashSet::new();
+    for archive in &healthcheck.archives {
+        ensure!(
+            seen_archives.insert(archive.platform.clone()),
+            "image `{}` repeats healthcheck archive for platform `{}`",
+            target.id,
+            archive.platform
+        );
+        ensure!(
+            target.platforms.contains(&archive.platform),
+            "image `{}` declares healthcheck archive for unsupported platform `{}`",
+            target.id,
+            archive.platform
+        );
+        ensure!(
+            archive.url.starts_with("https://"),
+            "image `{}` healthcheck archive URL must use https: {}",
+            target.id,
+            archive.url
+        );
+        ensure!(
+            sha256_pattern.is_match(&archive.sha256),
+            "image `{}` healthcheck archive checksum is invalid for platform `{}`",
+            target.id,
+            archive.platform
+        );
+    }
+
+    for platform in &target.platforms {
+        ensure!(
+            target.healthcheck_archive_for_platform(platform).is_some(),
+            "image `{}` is missing a healthcheck archive for platform `{platform}`",
+            target.id
+        );
+    }
 
     Ok(())
 }
@@ -201,10 +356,34 @@ fn validate_jdk_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<(
         target.id
     );
     ensure!(
+        !java.lang.trim().is_empty(),
+        "jdk image `{}` must declare LANG",
+        target.id
+    );
+    ensure!(
+        !java.language.trim().is_empty(),
+        "jdk image `{}` must declare LANGUAGE",
+        target.id
+    );
+    ensure!(
+        !java.lc_all.trim().is_empty(),
+        "jdk image `{}` must declare LC_ALL",
+        target.id
+    );
+    ensure!(
         !java.verify_commands.is_empty(),
         "jdk image `{}` must declare verify commands",
         target.id
     );
+    if java.generate_locales {
+        ensure!(
+            java.runtime_packages
+                .iter()
+                .any(|package| package == "locales"),
+            "jdk image `{}` generates locales but does not install `locales`",
+            target.id
+        );
+    }
 
     let mut seen_archives = HashSet::new();
 
@@ -368,6 +547,8 @@ mod tests {
             command: vec!["bash".to_string()],
             canonical_tags: canonical.iter().map(|value| value.to_string()).collect(),
             alias_tags: alias.iter().map(|value| value.to_string()).collect(),
+            init: None,
+            healthcheck: None,
             source: None,
             java: None,
             definition_file: "images/sample/image.toml".into(),

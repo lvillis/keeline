@@ -3,6 +3,78 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
+FROM docker.io/library/debian:13-slim AS init
+
+ENV TINO_RELEASE=0.1.15
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        wget \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "${ARCH}" in \
+        amd64) \
+            ESUM='4dc414d63bcc589a7c2f49e11004ba7ace0ea2a3c055df3bfd5c6406bb3b4444'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-x86_64-unknown-linux-musl.tar.gz'; \
+            ;; \
+        arm64) \
+            ESUM='a394b7c9356d6a99620e90a1e28aecca35799573a73093ed57405170d25c8584'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-aarch64-unknown-linux-musl.tar.gz'; \
+            ;; \
+        *) \
+            echo "Unsupported arch: ${ARCH}"; \
+            exit 1; \
+            ;; \
+    esac; \
+    wget --progress=dot:giga -O /tmp/archive.tar.gz "${BINARY_URL}"; \
+    echo "${ESUM} */tmp/archive.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/artifact /out; \
+    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 1 --no-same-owner; \
+    cp /tmp/artifact/tino /out/tino; \
+    chmod 0755 /out/tino; \
+    rm -rf /tmp/artifact /tmp/archive.tar.gz
+
+FROM docker.io/library/debian:13-slim AS healthcheck
+
+ENV SALUS_RELEASE=0.1.5
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        wget \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "${ARCH}" in \
+        amd64) \
+            ESUM='4c09ce0b84fbc64659d0ab7515e9b903ca7f76575a2f1190960bcbb4645b1435'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-x86_64-musl.tar.gz'; \
+            ;; \
+        arm64) \
+            ESUM='c2e634dfb30463acc59ae29d688f4c045ffee7568cd5e510c144ba5231ad0f37'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-aarch64-musl.tar.gz'; \
+            ;; \
+        *) \
+            echo "Unsupported arch: ${ARCH}"; \
+            exit 1; \
+            ;; \
+    esac; \
+    wget --progress=dot:giga -O /tmp/archive.tar.gz "${BINARY_URL}"; \
+    echo "${ESUM} */tmp/archive.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/artifact /out; \
+    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 1 --no-same-owner; \
+    cp /tmp/artifact/salus /out/salus; \
+    chmod 0755 /out/salus; \
+    rm -rf /tmp/artifact /tmp/archive.tar.gz
+
 FROM docker.io/library/debian:13-slim AS source
 
 ENV JAVA_HOME=/opt/java/openjdk
@@ -48,9 +120,9 @@ FROM docker.io/library/debian:13-slim
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
-ENV LANG="en_US.UTF-8"
-ENV LANGUAGE="en_US:en"
-ENV LC_ALL="en_US.UTF-8"
+ENV LANG="C.UTF-8"
+ENV LANGUAGE="C.UTF-8"
+ENV LC_ALL="C.UTF-8"
 
 ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
 ARG KEELINE_IMAGE_REVISION=unknown
@@ -60,15 +132,13 @@ RUN set -eux; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         binutils \
         ca-certificates \
-        fontconfig \
-        locales \
         tzdata \
     ; \
-    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen; \
-    locale-gen en_US.UTF-8; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=source /opt/java/openjdk /opt/java/openjdk
+COPY --from=init /out/tino /sbin/tino
+COPY --from=healthcheck /out/salus /bin/salus
 
 RUN set -eux; \
     find "$JAVA_HOME/lib" -name '*.so' -exec dirname '{}' ';' | sort -u > /etc/ld.so.conf.d/docker-openjdk.conf; \
@@ -84,4 +154,5 @@ LABEL org.opencontainers.image.title="Keeline JDK 21 Trixie Slim" \
       org.opencontainers.image.licenses="${KEELINE_IMAGE_LICENSES}" \
       org.opencontainers.image.version="21.0.10"
 
+ENTRYPOINT ["/sbin/tino","-g","-s","--"]
 CMD ["jshell"]

@@ -27,6 +27,10 @@ pub struct RawImageDefinition {
     pub status: ImageStatus,
     pub platforms: Vec<String>,
     #[serde(default)]
+    pub init: Option<RawInitRuntime>,
+    #[serde(default)]
+    pub healthcheck: Option<RawHealthcheckRuntime>,
+    #[serde(default)]
     pub source: Option<RawSource>,
     #[serde(default)]
     pub java: Option<RawJavaRuntime>,
@@ -53,12 +57,47 @@ pub struct RawSourceArchive {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct RawInitRuntime {
+    pub provider: String,
+    pub release: String,
+    pub binary_path: String,
+    #[serde(default = "default_download_install_packages")]
+    pub install_packages: Vec<String>,
+    #[serde(default = "default_strip_components")]
+    pub strip_components: u8,
+    pub entrypoint: Vec<String>,
+    #[serde(default)]
+    pub archives: Vec<RawSourceArchive>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawHealthcheckRuntime {
+    pub provider: String,
+    pub release: String,
+    pub binary_path: String,
+    #[serde(default = "default_download_install_packages")]
+    pub install_packages: Vec<String>,
+    #[serde(default = "default_strip_components")]
+    pub strip_components: u8,
+    #[serde(default)]
+    pub archives: Vec<RawSourceArchive>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct RawJavaRuntime {
     pub java_home: String,
     #[serde(default)]
     pub builder_packages: Vec<String>,
     #[serde(default)]
     pub runtime_packages: Vec<String>,
+    #[serde(default = "default_lang")]
+    pub lang: String,
+    #[serde(default = "default_language")]
+    pub language: String,
+    #[serde(default = "default_lc_all")]
+    pub lc_all: String,
+    #[serde(default = "default_generate_locales")]
+    pub generate_locales: bool,
     #[serde(default)]
     pub verify_commands: Vec<String>,
     #[serde(default)]
@@ -75,6 +114,16 @@ pub struct RawVariant {
     pub description: String,
     #[serde(default)]
     pub command: Vec<String>,
+    #[serde(default)]
+    pub runtime_packages: Option<Vec<String>>,
+    #[serde(default)]
+    pub lang: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub lc_all: Option<String>,
+    #[serde(default)]
+    pub generate_locales: Option<bool>,
     pub canonical: Vec<String>,
     #[serde(default)]
     pub alias: Vec<String>,
@@ -97,10 +146,35 @@ pub struct SourceArchive {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct InitRuntime {
+    pub provider: String,
+    pub release: String,
+    pub binary_path: String,
+    pub install_packages: Vec<String>,
+    pub strip_components: u8,
+    pub entrypoint: Vec<String>,
+    pub archives: Vec<SourceArchive>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HealthcheckRuntime {
+    pub provider: String,
+    pub release: String,
+    pub binary_path: String,
+    pub install_packages: Vec<String>,
+    pub strip_components: u8,
+    pub archives: Vec<SourceArchive>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct JavaRuntime {
     pub java_home: String,
     pub builder_packages: Vec<String>,
     pub runtime_packages: Vec<String>,
+    pub lang: String,
+    pub language: String,
+    pub lc_all: String,
+    pub generate_locales: bool,
     pub verify_commands: Vec<String>,
     pub trim_files: Vec<String>,
 }
@@ -126,6 +200,8 @@ pub struct ImageTarget {
     pub command: Vec<String>,
     pub canonical_tags: Vec<String>,
     pub alias_tags: Vec<String>,
+    pub init: Option<InitRuntime>,
+    pub healthcheck: Option<HealthcheckRuntime>,
     pub source: Option<ImageSource>,
     pub java: Option<JavaRuntime>,
     pub definition_file: PathBuf,
@@ -194,6 +270,22 @@ impl ImageTarget {
             .find(|archive| archive.platform == platform)
     }
 
+    pub fn init_archive_for_platform(&self, platform: &str) -> Option<&SourceArchive> {
+        self.init
+            .as_ref()?
+            .archives
+            .iter()
+            .find(|archive| archive.platform == platform)
+    }
+
+    pub fn healthcheck_archive_for_platform(&self, platform: &str) -> Option<&SourceArchive> {
+        self.healthcheck
+            .as_ref()?
+            .archives
+            .iter()
+            .find(|archive| archive.platform == platform)
+    }
+
     pub fn is_releasable(&self) -> bool {
         self.publish && self.status == ImageStatus::Stable
     }
@@ -213,6 +305,26 @@ pub fn default_schema() -> u32 {
 
 pub fn default_strip_components() -> u8 {
     1
+}
+
+pub fn default_lang() -> String {
+    "en_US.UTF-8".to_string()
+}
+
+pub fn default_language() -> String {
+    "en_US:en".to_string()
+}
+
+pub fn default_lc_all() -> String {
+    "en_US.UTF-8".to_string()
+}
+
+pub fn default_generate_locales() -> bool {
+    true
+}
+
+pub fn default_download_install_packages() -> Vec<String> {
+    vec!["ca-certificates".to_string(), "wget".to_string()]
 }
 
 pub fn default_publish() -> bool {
@@ -258,6 +370,8 @@ mod tests {
             command: vec!["jshell".to_string()],
             canonical_tags: vec!["21-trixie".to_string()],
             alias_tags: Vec::new(),
+            init: None,
+            healthcheck: None,
             source: None,
             java: None,
             definition_file: "images/jdk/21/trixie/image.toml".into(),

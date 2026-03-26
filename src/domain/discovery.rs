@@ -5,7 +5,8 @@ use anyhow::{Context, Result};
 use walkdir::WalkDir;
 
 use crate::domain::model::{
-    ImageCatalog, ImageSource, ImageTarget, JavaRuntime, RawImageDefinition, SourceArchive,
+    HealthcheckRuntime, ImageCatalog, ImageSource, ImageTarget, InitRuntime, JavaRuntime,
+    RawImageDefinition, SourceArchive,
 };
 
 pub fn discover(root: &Path) -> Result<ImageCatalog> {
@@ -41,10 +42,50 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 })
                 .collect(),
         });
+        let init = definition.init.as_ref().map(|init| InitRuntime {
+            provider: init.provider.clone(),
+            release: init.release.clone(),
+            binary_path: init.binary_path.clone(),
+            install_packages: init.install_packages.clone(),
+            strip_components: init.strip_components,
+            entrypoint: init.entrypoint.clone(),
+            archives: init
+                .archives
+                .iter()
+                .map(|archive| SourceArchive {
+                    platform: archive.platform.clone(),
+                    url: archive.url.clone(),
+                    sha256: archive.sha256.clone(),
+                })
+                .collect(),
+        });
+        let healthcheck = definition
+            .healthcheck
+            .as_ref()
+            .map(|healthcheck| HealthcheckRuntime {
+                provider: healthcheck.provider.clone(),
+                release: healthcheck.release.clone(),
+                binary_path: healthcheck.binary_path.clone(),
+                install_packages: healthcheck.install_packages.clone(),
+                strip_components: healthcheck.strip_components,
+                archives: healthcheck
+                    .archives
+                    .iter()
+                    .map(|archive| SourceArchive {
+                        platform: archive.platform.clone(),
+                        url: archive.url.clone(),
+                        sha256: archive.sha256.clone(),
+                    })
+                    .collect(),
+            });
         let java = definition.java.as_ref().map(|java| JavaRuntime {
             java_home: java.java_home.clone(),
             builder_packages: java.builder_packages.clone(),
             runtime_packages: java.runtime_packages.clone(),
+            lang: java.lang.clone(),
+            language: java.language.clone(),
+            lc_all: java.lc_all.clone(),
+            generate_locales: java.generate_locales,
             verify_commands: java.verify_commands.clone(),
             trim_files: java.trim_files.clone(),
         });
@@ -54,6 +95,25 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 "default" => definition.id.clone(),
                 name => format!("{}-{name}", definition.id),
             };
+
+            let mut variant_java = java.clone();
+            if let Some(java) = &mut variant_java {
+                if let Some(runtime_packages) = variant.runtime_packages.clone() {
+                    java.runtime_packages = runtime_packages;
+                }
+                if let Some(lang) = variant.lang.clone() {
+                    java.lang = lang;
+                }
+                if let Some(language) = variant.language.clone() {
+                    java.language = language;
+                }
+                if let Some(lc_all) = variant.lc_all.clone() {
+                    java.lc_all = lc_all;
+                }
+                if let Some(generate_locales) = variant.generate_locales {
+                    java.generate_locales = generate_locales;
+                }
+            }
 
             targets.push(ImageTarget {
                 schema: definition.schema,
@@ -75,8 +135,10 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 command: variant.command,
                 canonical_tags: variant.canonical,
                 alias_tags: variant.alias,
+                init: init.clone(),
+                healthcheck: healthcheck.clone(),
                 source: source.clone(),
-                java: java.clone(),
+                java: variant_java,
                 definition_file: definition_file.clone(),
             });
         }

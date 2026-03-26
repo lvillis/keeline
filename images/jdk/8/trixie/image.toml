@@ -9,6 +9,37 @@ publish = true
 status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
+[init]
+provider = "tino"
+release = "0.1.15"
+binary_path = "/sbin/tino"
+entrypoint = ["/sbin/tino", "-g", "-s", "--"]
+
+[[init.archives]]
+platform = "linux/amd64"
+url = "https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-x86_64-unknown-linux-musl.tar.gz"
+sha256 = "4dc414d63bcc589a7c2f49e11004ba7ace0ea2a3c055df3bfd5c6406bb3b4444"
+
+[[init.archives]]
+platform = "linux/arm64"
+url = "https://github.com/lvillis/tino/releases/download/0.1.15/tino-0.1.15-aarch64-unknown-linux-musl.tar.gz"
+sha256 = "a394b7c9356d6a99620e90a1e28aecca35799573a73093ed57405170d25c8584"
+
+[healthcheck]
+provider = "salus"
+release = "0.1.5"
+binary_path = "/bin/salus"
+
+[[healthcheck.archives]]
+platform = "linux/amd64"
+url = "https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-x86_64-musl.tar.gz"
+sha256 = "4c09ce0b84fbc64659d0ab7515e9b903ca7f76575a2f1190960bcbb4645b1435"
+
+[[healthcheck.archives]]
+platform = "linux/arm64"
+url = "https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-aarch64-musl.tar.gz"
+sha256 = "c2e634dfb30463acc59ae29d688f4c045ffee7568cd5e510c144ba5231ad0f37"
+
 [source]
 provider = "adoptium-temurin"
 release = "jdk8u372-b07"
@@ -28,6 +59,10 @@ sha256 = "195808eb42ab73535c84de05188914a52a47c1ac784e4bf66de95fe1fd315a5a"
 java_home = "/opt/java/openjdk"
 builder_packages = ["ca-certificates", "gnupg", "wget"]
 runtime_packages = ["binutils", "ca-certificates", "fontconfig", "locales", "tzdata"]
+lang = "en_US.UTF-8"
+language = "en_US:en"
+lc_all = "en_US.UTF-8"
+generate_locales = true
 verify_commands = ["java -Xshare:dump", "java -version", "javac -version"]
 trim_files = ["src.zip"]
 
@@ -47,4 +82,9 @@ base_image = "docker.io/library/debian:13-slim"
 title = "Keeline JDK 8u372 Trixie Slim"
 description = "Keeline JDK 8u372 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs"
 command = ["sh"]
+runtime_packages = ["binutils", "ca-certificates", "tzdata"]
+lang = "C.UTF-8"
+language = "C.UTF-8"
+lc_all = "C.UTF-8"
+generate_locales = false
 canonical = ["8u372-trixie-slim"]
