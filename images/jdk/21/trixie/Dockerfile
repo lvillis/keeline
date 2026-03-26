@@ -3,7 +3,7 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
-FROM debian:13-slim AS source
+FROM docker.io/library/debian:13-slim AS source
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV JAVA_RELEASE=jdk-21.0.10+7
@@ -44,7 +44,7 @@ RUN set -eux; \
     tar --extract --file /tmp/openjdk.tar.gz --directory "$JAVA_HOME" --strip-components 1 --no-same-owner; \
     rm -f /tmp/openjdk.tar.gz $JAVA_HOME/lib/src.zip;
 
-FROM debian:13
+FROM docker.io/library/debian:13
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
@@ -62,7 +62,6 @@ RUN set -eux; \
         ca-certificates \
         fontconfig \
         locales \
-        p11-kit \
         tzdata \
     ; \
     echo "en_US.UTF-8 UTF-8" > /etc/locale.gen; \
@@ -78,58 +77,6 @@ RUN set -eux; \
     java -version; \
     javac --version
 
-RUN set -eux; \
-    cat <<'EOF' > /usr/local/bin/keeline-java-entrypoint
-#!/usr/bin/env sh
-set -eu
-
-TMPDIR=${TMPDIR:-/tmp}
-JRE_CACERTS_PATH=$JAVA_HOME/lib/security/cacerts
-
-if [ -n "${USE_SYSTEM_CA_CERTS:-}" ]; then
-    if [ ! -w "$TMPDIR" ]; then
-        echo "Using system CA certificates requires write access to $TMPDIR." >&2
-        exit 1
-    fi
-
-    if [ ! -w "$JRE_CACERTS_PATH" ]; then
-        JRE_CACERTS_PATH_NEW=$(mktemp)
-        cp "$JRE_CACERTS_PATH" "$JRE_CACERTS_PATH_NEW"
-        JRE_CACERTS_PATH="$JRE_CACERTS_PATH_NEW"
-        if [ -n "${JAVA_TOOL_OPTIONS:-}" ]; then
-            export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} -Djavax.net.ssl.trustStore=${JRE_CACERTS_PATH} -Djavax.net.ssl.trustStorePassword=changeit"
-        else
-            export JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=${JRE_CACERTS_PATH} -Djavax.net.ssl.trustStorePassword=changeit"
-        fi
-    fi
-
-    tmp_store=$(mktemp)
-    trust extract --overwrite --format=java-cacerts --filter=ca-anchors --purpose=server-auth "$tmp_store" > /dev/null
-    keytool -importkeystore -destkeystore "$JRE_CACERTS_PATH" -srckeystore "$tmp_store" -srcstorepass changeit -deststorepass changeit -noprompt > /dev/null
-    rm -f "$tmp_store"
-
-    if [ -d /certificates ]; then
-        for cert in /certificates/*.crt; do
-            [ -f "$cert" ] || continue
-            alias_name=$(basename "$cert" .crt)
-            keytool -delete -alias "$alias_name" -keystore "$JRE_CACERTS_PATH" -storepass changeit > /dev/null 2>&1 || true
-            keytool -importcert -noprompt -alias "$alias_name" -file "$cert" -keystore "$JRE_CACERTS_PATH" -storepass changeit > /dev/null
-        done
-    fi
-
-    if [ "$(id -u)" -eq 0 ]; then
-        if [ -d /certificates ] && [ "$(ls -A /certificates 2>/dev/null)" ]; then
-            cp -La /certificates/* /usr/local/share/ca-certificates/
-        fi
-        update-ca-certificates
-    fi
-fi
-
-export JRE_CACERTS_PATH
-exec "$@"
-EOF
-RUN chmod 755 /usr/local/bin/keeline-java-entrypoint
-
 LABEL org.opencontainers.image.title="Keeline JDK 21 Trixie" \
       org.opencontainers.image.description="Keeline JDK 21.0.10 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \
@@ -137,5 +84,4 @@ LABEL org.opencontainers.image.title="Keeline JDK 21 Trixie" \
       org.opencontainers.image.licenses="${KEELINE_IMAGE_LICENSES}" \
       org.opencontainers.image.version="21.0.10"
 
-ENTRYPOINT ["/usr/local/bin/keeline-java-entrypoint"]
 CMD ["jshell"]

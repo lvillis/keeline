@@ -360,7 +360,7 @@ mod tests {
             context: "images/sample".into(),
             dockerfile: "images/sample/Dockerfile".into(),
             platforms: vec!["linux/amd64".to_string()],
-            base_image: "debian:13".to_string(),
+            base_image: "docker.io/library/debian:13".to_string(),
             title: "Sample".to_string(),
             description: "Sample image".to_string(),
             command: vec!["bash".to_string()],

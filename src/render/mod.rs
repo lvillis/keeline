@@ -125,11 +125,6 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
         .iter()
         .map(|path| normalize_trim_path(path))
         .collect();
-    let cacerts_path = if target.line == "8" {
-        "$JAVA_HOME/jre/lib/security/cacerts"
-    } else {
-        "$JAVA_HOME/lib/security/cacerts"
-    };
     let case_statement = render_archive_case_statement(&source.archives)?;
 
     let mut output = String::new();
@@ -208,15 +203,8 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
         output.push('\n');
     }
     writeln!(output)?;
-    output.push_str("RUN set -eux; \\\n");
-    output.push_str("    cat <<'EOF' > /usr/local/bin/keeline-java-entrypoint\n");
-    output.push_str(&java_entrypoint_script(cacerts_path));
-    output.push_str("EOF\n");
-    output.push_str("RUN chmod 755 /usr/local/bin/keeline-java-entrypoint\n");
-    output.push('\n');
     append_common_labels(&mut output, target)?;
     output.push('\n');
-    output.push_str("ENTRYPOINT [\"/usr/local/bin/keeline-java-entrypoint\"]\n");
     writeln!(output, "CMD {command}")?;
 
     Ok(output)
@@ -312,15 +300,28 @@ fn dpkg_arch_for_platform(platform: &str) -> Result<&'static str> {
 }
 
 fn builder_image(base_image: &str) -> String {
-    if let Some(tag) = base_image.strip_prefix("debian:") {
-        if tag.ends_with("-slim") {
-            return base_image.to_string();
-        }
+    if let Some((repository, tag)) = split_image_reference(base_image) {
+        if matches!(repository, "debian" | "docker.io/debian" | "docker.io/library/debian") {
+            if tag.ends_with("-slim") {
+                return base_image.to_string();
+            }
 
-        return format!("debian:{tag}-slim");
+            return format!("{repository}:{tag}-slim");
+        }
     }
 
     base_image.to_string()
+}
+
+fn split_image_reference(reference: &str) -> Option<(&str, &str)> {
+    let last_slash = reference.rfind('/').unwrap_or(0);
+    let last_colon = reference.rfind(':')?;
+
+    if last_colon < last_slash {
+        return None;
+    }
+
+    Some((&reference[..last_colon], &reference[last_colon + 1..]))
 }
 
 fn normalize_trim_path(path: &str) -> String {
@@ -339,20 +340,20 @@ fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
-fn java_entrypoint_script(cacerts_path: &str) -> String {
-    format!(
-        "#!/usr/bin/env sh\nset -eu\n\nTMPDIR=${{TMPDIR:-/tmp}}\nJRE_CACERTS_PATH={cacerts_path}\n\nif [ -n \"${{USE_SYSTEM_CA_CERTS:-}}\" ]; then\n    if [ ! -w \"$TMPDIR\" ]; then\n        echo \"Using system CA certificates requires write access to $TMPDIR.\" >&2\n        exit 1\n    fi\n\n    if [ ! -w \"$JRE_CACERTS_PATH\" ]; then\n        JRE_CACERTS_PATH_NEW=$(mktemp)\n        cp \"$JRE_CACERTS_PATH\" \"$JRE_CACERTS_PATH_NEW\"\n        JRE_CACERTS_PATH=\"$JRE_CACERTS_PATH_NEW\"\n        if [ -n \"${{JAVA_TOOL_OPTIONS:-}}\" ]; then\n            export JAVA_TOOL_OPTIONS=\"${{JAVA_TOOL_OPTIONS}} -Djavax.net.ssl.trustStore=${{JRE_CACERTS_PATH}} -Djavax.net.ssl.trustStorePassword=changeit\"\n        else\n            export JAVA_TOOL_OPTIONS=\"-Djavax.net.ssl.trustStore=${{JRE_CACERTS_PATH}} -Djavax.net.ssl.trustStorePassword=changeit\"\n        fi\n    fi\n\n    tmp_store=$(mktemp)\n    trust extract --overwrite --format=java-cacerts --filter=ca-anchors --purpose=server-auth \"$tmp_store\" > /dev/null\n    keytool -importkeystore -destkeystore \"$JRE_CACERTS_PATH\" -srckeystore \"$tmp_store\" -srcstorepass changeit -deststorepass changeit -noprompt > /dev/null\n    rm -f \"$tmp_store\"\n\n    if [ -d /certificates ]; then\n        for cert in /certificates/*.crt; do\n            [ -f \"$cert\" ] || continue\n            alias_name=$(basename \"$cert\" .crt)\n            keytool -delete -alias \"$alias_name\" -keystore \"$JRE_CACERTS_PATH\" -storepass changeit > /dev/null 2>&1 || true\n            keytool -importcert -noprompt -alias \"$alias_name\" -file \"$cert\" -keystore \"$JRE_CACERTS_PATH\" -storepass changeit > /dev/null\n        done\n    fi\n\n    if [ \"$(id -u)\" -eq 0 ]; then\n        if [ -d /certificates ] && [ \"$(ls -A /certificates 2>/dev/null)\" ]; then\n            cp -La /certificates/* /usr/local/share/ca-certificates/\n        fi\n        update-ca-certificates\n    fi\nfi\n\nexport JRE_CACERTS_PATH\nexec \"$@\"\n"
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::{builder_image, normalize_trim_path};
 
     #[test]
     fn derives_slim_builder_image_from_full_debian_base() {
-        assert_eq!(builder_image("debian:13"), "debian:13-slim");
-        assert_eq!(builder_image("debian:13-slim"), "debian:13-slim");
+        assert_eq!(
+            builder_image("docker.io/library/debian:13"),
+            "docker.io/library/debian:13-slim"
+        );
+        assert_eq!(
+            builder_image("docker.io/library/debian:13-slim"),
+            "docker.io/library/debian:13-slim"
+        );
     }
 
     #[test]

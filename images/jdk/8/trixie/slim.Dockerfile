@@ -6,7 +6,7 @@
 FROM docker.io/library/debian:13-slim AS source
 
 ENV JAVA_HOME=/opt/java/openjdk
-ENV JAVA_RELEASE=jdk-21.0.10+7
+ENV JAVA_RELEASE=jdk8u372-b07
 
 RUN set -eux; \
     apt-get update; \
@@ -21,12 +21,12 @@ RUN set -eux; \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
         amd64) \
-            ESUM='ea3b9bd464d6dd253e9a7accf59f7ccd2a36e4aa69640b7251e3370caef896a4'; \
-            BINARY_URL='https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz'; \
+            ESUM='78a0b3547d6f3d46227f2ad8c774248425f20f1cd63f399b713f0cdde2cc376c'; \
+            BINARY_URL='https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz'; \
             ;; \
         arm64) \
-            ESUM='357fee29fb0d5c079f6730db98b28942df13a6eed426f6c61cd4ad703ab27b9a'; \
-            BINARY_URL='https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.10_7.tar.gz'; \
+            ESUM='195808eb42ab73535c84de05188914a52a47c1ac784e4bf66de95fe1fd315a5a'; \
+            BINARY_URL='https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz'; \
             ;; \
         *) \
             echo "Unsupported arch: ${ARCH}"; \
@@ -42,7 +42,7 @@ RUN set -eux; \
     echo "${ESUM} */tmp/openjdk.tar.gz" | sha256sum -c -; \
     mkdir -p "$JAVA_HOME"; \
     tar --extract --file /tmp/openjdk.tar.gz --directory "$JAVA_HOME" --strip-components 1 --no-same-owner; \
-    rm -f /tmp/openjdk.tar.gz $JAVA_HOME/lib/src.zip;
+    rm -f /tmp/openjdk.tar.gz $JAVA_HOME/src.zip;
 
 FROM docker.io/library/debian:13-slim
 
@@ -75,13 +75,13 @@ RUN set -eux; \
     ldconfig; \
     java -Xshare:dump; \
     java -version; \
-    javac --version
+    javac -version
 
-LABEL org.opencontainers.image.title="Keeline JDK 21 Trixie Slim" \
-      org.opencontainers.image.description="Keeline JDK 21.0.10 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs" \
+LABEL org.opencontainers.image.title="Keeline JDK 8u372 Trixie Slim" \
+      org.opencontainers.image.description="Keeline JDK 8u372 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \
       org.opencontainers.image.revision="${KEELINE_IMAGE_REVISION}" \
       org.opencontainers.image.licenses="${KEELINE_IMAGE_LICENSES}" \
-      org.opencontainers.image.version="21.0.10"
+      org.opencontainers.image.version="8u372"
 
-CMD ["jshell"]
+CMD ["sh"]

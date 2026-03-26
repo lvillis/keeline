@@ -25,14 +25,14 @@ sha256 = "592a6702b3a07a0e0b82cb38aaab149bfce1b0c24d6b57ddb410bd9009333095"
 [java]
 java_home = "/opt/java/openjdk"
 builder_packages = ["ca-certificates", "gnupg", "wget"]
-runtime_packages = ["binutils", "ca-certificates", "fontconfig", "locales", "p11-kit", "tzdata"]
+runtime_packages = ["binutils", "ca-certificates", "fontconfig", "locales", "tzdata"]
 verify_commands = ["java -Xshare:dump", "java -version", "javac --version"]
 trim_files = ["lib/src.zip"]
 
 [[variants]]
 name = "default"
 dockerfile = "Dockerfile"
-base_image = "debian:13"
+base_image = "docker.io/library/debian:13"
 title = "Keeline JDK 17 Trixie"
 description = "Keeline JDK 17.0.18 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs"
 command = ["jshell"]
@@ -41,7 +41,7 @@ canonical = ["17-trixie", "17.0.18-trixie"]
 [[variants]]
 name = "slim"
 dockerfile = "slim.Dockerfile"
-base_image = "debian:13-slim"
+base_image = "docker.io/library/debian:13-slim"
 title = "Keeline JDK 17 Trixie Slim"
 description = "Keeline JDK 17.0.18 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs"
 command = ["jshell"]

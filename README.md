@@ -18,13 +18,14 @@ Current published image lines:
 - `ghcr.io/lvillis/keeline-jdk:21-trixie`
 - `ghcr.io/lvillis/keeline-jdk:21-trixie-slim`
 - `ghcr.io/lvillis/keeline-jdk:8u372-trixie`
+- `ghcr.io/lvillis/keeline-jdk:8u372-trixie-slim`
 
 ## Tag Rules
 
 - Package names express the image family.
 - Image tags express version and variant.
 - Debian tags use forms like `13` and `13-slim`.
-- JDK tags use forms like `21-trixie`, `21.0.10-trixie`, and `8u372-trixie`.
+- JDK tags use forms like `21-trixie`, `21.0.10-trixie`, `8u372-trixie`, and `8u372-trixie-slim`.
 - `latest` is not published.
 
 ## Usage

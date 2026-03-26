@@ -3,7 +3,7 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
-FROM debian:13
+FROM docker.io/library/debian:13
 
 ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
 ARG KEELINE_IMAGE_REVISION=unknown

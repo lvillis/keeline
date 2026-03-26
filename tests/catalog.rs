@@ -8,7 +8,7 @@ use keeline::render;
 #[test]
 fn discovers_expected_image_targets() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
-    assert_eq!(catalog.targets.len(), 7);
+    assert_eq!(catalog.targets.len(), 8);
 }
 
 #[test]
@@ -43,7 +43,7 @@ platforms = ["linux/amd64"]
 [[variants]]
 name = "default"
 dockerfile = "Dockerfile"
-base_image = "debian:13"
+base_image = "docker.io/library/debian:13"
 title = "Keeline Debian 13"
 description = "Keeline Debian 13 (trixie) base image"
 command = ["bash"]
