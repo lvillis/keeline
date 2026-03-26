@@ -55,6 +55,10 @@ fn rendered_images_include_tino_entrypoint() {
     assert!(jdk_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
     assert!(jdk_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
     assert!(jdk_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
+    assert!(
+        jdk_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
+            > jdk_rendered.find("    javac --version\n\n").unwrap()
+    );
 }
 
 #[test]

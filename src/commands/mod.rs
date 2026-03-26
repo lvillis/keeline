@@ -18,6 +18,16 @@ pub(crate) fn build_args() -> Vec<(String, String)> {
     ]
 }
 
+pub(crate) fn registry_cache_from(repository: &str) -> Vec<String> {
+    vec![format!("type=registry,ref={repository}:buildcache")]
+}
+
+pub(crate) fn registry_cache_to(repository: &str) -> Vec<String> {
+    vec![format!(
+        "type=registry,ref={repository}:buildcache,mode=max"
+    )]
+}
+
 fn image_source() -> String {
     std::env::var("KEELINE_IMAGE_SOURCE")
         .ok()

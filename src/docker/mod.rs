@@ -8,6 +8,8 @@ pub struct DockerBuild {
     pub context: PathBuf,
     pub dockerfile: PathBuf,
     pub build_args: Vec<(String, String)>,
+    pub cache_from: Vec<String>,
+    pub cache_to: Vec<String>,
     pub tags: Vec<String>,
     pub platforms: Vec<String>,
     pub push: bool,
@@ -28,6 +30,16 @@ impl DockerBuild {
         for (name, value) in &self.build_args {
             parts.push("--build-arg".to_string());
             parts.push(format!("{name}={value}"));
+        }
+
+        for cache_from in &self.cache_from {
+            parts.push("--cache-from".to_string());
+            parts.push(cache_from.clone());
+        }
+
+        for cache_to in &self.cache_to {
+            parts.push("--cache-to".to_string());
+            parts.push(cache_to.clone());
         }
 
         if !self.platforms.is_empty() {
@@ -66,6 +78,14 @@ impl DockerBuild {
             command.arg("--build-arg").arg(format!("{name}={value}"));
         }
 
+        for cache_from in &self.cache_from {
+            command.arg("--cache-from").arg(cache_from);
+        }
+
+        for cache_to in &self.cache_to {
+            command.arg("--cache-to").arg(cache_to);
+        }
+
         if !self.platforms.is_empty() {
             command.arg("--platform").arg(self.platforms.join(","));
         }
@@ -93,5 +113,43 @@ impl DockerBuild {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::DockerBuild;
+
+    #[test]
+    fn display_includes_explicit_cache_options() {
+        let request = DockerBuild {
+            context: PathBuf::from("images/jdk/21/trixie"),
+            dockerfile: PathBuf::from("images/jdk/21/trixie/Dockerfile"),
+            build_args: vec![(
+                "KEELINE_IMAGE_SOURCE".to_string(),
+                "https://example.com/repo".to_string(),
+            )],
+            cache_from: vec![
+                "type=registry,ref=ghcr.io/example/keeline-jdk:buildcache".to_string(),
+            ],
+            cache_to: vec![
+                "type=registry,ref=ghcr.io/example/keeline-jdk:buildcache,mode=max".to_string(),
+            ],
+            tags: vec!["ghcr.io/example/keeline-jdk:21-trixie".to_string()],
+            platforms: vec!["linux/amd64".to_string(), "linux/arm64".to_string()],
+            push: true,
+            load: false,
+        };
+
+        let display = request.display();
+        assert!(
+            display
+                .contains("--cache-from type=registry,ref=ghcr.io/example/keeline-jdk:buildcache")
+        );
+        assert!(display.contains(
+            "--cache-to type=registry,ref=ghcr.io/example/keeline-jdk:buildcache,mode=max"
+        ));
     }
 }

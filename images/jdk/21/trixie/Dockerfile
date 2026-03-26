@@ -124,9 +124,6 @@ ENV LANG="en_US.UTF-8"
 ENV LANGUAGE="en_US:en"
 ENV LC_ALL="en_US.UTF-8"
 
-ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
-ARG KEELINE_IMAGE_REVISION=unknown
-ARG KEELINE_IMAGE_LICENSES=Apache-2.0
 RUN set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -151,6 +148,9 @@ RUN set -eux; \
     java -version; \
     javac --version
 
+ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
+ARG KEELINE_IMAGE_REVISION=unknown
+ARG KEELINE_IMAGE_LICENSES=Apache-2.0
 LABEL org.opencontainers.image.title="Keeline JDK 21 Trixie" \
       org.opencontainers.image.description="Keeline JDK 21.0.10 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \

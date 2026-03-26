@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, ensure};
 
 use crate::cli::ReleaseArgs;
-use crate::commands::build_args;
+use crate::commands::{build_args, registry_cache_from, registry_cache_to};
 use crate::docker::DockerBuild;
 use crate::domain::{ImageCatalog, ImageTarget};
 use crate::render;
@@ -45,6 +45,8 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
             context: target.context.clone(),
             dockerfile: target.dockerfile.clone(),
             build_args: build_args(),
+            cache_from: registry_cache_from(&repository),
+            cache_to: registry_cache_to(&repository),
             tags,
             platforms: target.platforms.clone(),
             push: true,

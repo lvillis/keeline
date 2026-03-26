@@ -24,6 +24,8 @@ pub fn run(catalog: &ImageCatalog, args: &BuildArgs) -> Result<()> {
         context: target.context.clone(),
         dockerfile: target.dockerfile.clone(),
         build_args: build_args(),
+        cache_from: Vec::new(),
+        cache_to: Vec::new(),
         tags: vec![format!("{repository}:{}", target.primary_tag())],
         platforms: args.platform.clone().into_iter().collect(),
         push: false,

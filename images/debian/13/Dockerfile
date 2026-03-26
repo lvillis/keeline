@@ -77,12 +77,12 @@ RUN set -eux; \
 
 FROM docker.io/library/debian:13
 
-ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
-ARG KEELINE_IMAGE_REVISION=unknown
-ARG KEELINE_IMAGE_LICENSES=Apache-2.0
 COPY --from=init /out/tino /sbin/tino
 COPY --from=healthcheck /out/salus /bin/salus
 
+ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
+ARG KEELINE_IMAGE_REVISION=unknown
+ARG KEELINE_IMAGE_LICENSES=Apache-2.0
 LABEL org.opencontainers.image.title="Keeline Debian 13" \
       org.opencontainers.image.description="Keeline Debian 13 (trixie) base image" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \

@@ -148,7 +148,6 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
     )?;
     writeln!(output, "FROM {}", target.base_image)?;
     output.push('\n');
-    append_label_args(&mut output)?;
     writeln!(
         output,
         "COPY --from=init /out/{} {}",
@@ -162,6 +161,7 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
         healthcheck.binary_path
     )?;
     writeln!(output)?;
+    append_label_args(&mut output)?;
     append_common_labels(&mut output, target)?;
     output.push('\n');
     writeln!(output, "ENTRYPOINT {entrypoint}")?;
@@ -269,7 +269,6 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
     writeln!(output, "ENV LANGUAGE=\"{}\"", java.language)?;
     writeln!(output, "ENV LC_ALL=\"{}\"", java.lc_all)?;
     output.push('\n');
-    append_label_args(&mut output)?;
     append_apt_install(&mut output, &java.runtime_packages, java.generate_locales)?;
     writeln!(output)?;
     writeln!(
@@ -310,6 +309,7 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
         output.push('\n');
     }
     writeln!(output)?;
+    append_label_args(&mut output)?;
     append_common_labels(&mut output, target)?;
     output.push('\n');
     writeln!(
@@ -498,7 +498,12 @@ fn shell_quote(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{builder_image, normalize_trim_path};
+    use std::path::PathBuf;
+
+    use super::{builder_image, normalize_trim_path, render};
+    use crate::domain::{
+        HealthcheckRuntime, ImageStatus, ImageTarget, InitRuntime, JavaRuntime, SourceArchive,
+    };
 
     #[test]
     fn derives_slim_builder_image_from_full_debian_base() {
@@ -516,5 +521,106 @@ mod tests {
     fn normalizes_trim_paths_under_java_home() {
         assert_eq!(normalize_trim_path("lib/src.zip"), "$JAVA_HOME/lib/src.zip");
         assert_eq!(normalize_trim_path("/tmp/example"), "/tmp/example");
+    }
+
+    #[test]
+    fn places_label_args_after_runtime_verification_in_jdk_images() {
+        let target = ImageTarget {
+            schema: 1,
+            id: "jdk-21-trixie".to_string(),
+            family: "jdk".to_string(),
+            line: "21".to_string(),
+            version: "21.0.10".to_string(),
+            distro: Some("trixie".to_string()),
+            package: "keeline-jdk".to_string(),
+            publish: true,
+            status: ImageStatus::Stable,
+            variant: "default".to_string(),
+            context: PathBuf::from("images/jdk/21/trixie"),
+            dockerfile: PathBuf::from("images/jdk/21/trixie/Dockerfile"),
+            platforms: vec!["linux/amd64".to_string()],
+            base_image: "docker.io/library/debian:13".to_string(),
+            title: "Keeline JDK 21 Trixie".to_string(),
+            description: "Keeline JDK 21.0.10 on Debian 13 (trixie)".to_string(),
+            command: vec!["jshell".to_string()],
+            canonical_tags: vec!["21-trixie".to_string()],
+            alias_tags: vec![],
+            init: Some(InitRuntime {
+                provider: "tino".to_string(),
+                release: "0.1.15".to_string(),
+                binary_path: "/sbin/tino".to_string(),
+                install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
+                strip_components: 1,
+                entrypoint: vec![
+                    "/sbin/tino".to_string(),
+                    "-g".to_string(),
+                    "-s".to_string(),
+                    "--".to_string(),
+                ],
+                archives: vec![SourceArchive {
+                    platform: "linux/amd64".to_string(),
+                    url: "https://example.com/tino.tar.gz".to_string(),
+                    sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .to_string(),
+                }],
+            }),
+            healthcheck: Some(HealthcheckRuntime {
+                provider: "salus".to_string(),
+                release: "0.1.6".to_string(),
+                binary_path: "/bin/salus".to_string(),
+                install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
+                strip_components: 0,
+                archives: vec![SourceArchive {
+                    platform: "linux/amd64".to_string(),
+                    url: "https://example.com/salus.tar.gz".to_string(),
+                    sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .to_string(),
+                }],
+            }),
+            source: Some(crate::domain::ImageSource {
+                provider: "adoptium".to_string(),
+                release: "jdk-21.0.10+7".to_string(),
+                gpg_key: "3B04D753C9050D9A5D343F39843C48A565F8F04B".to_string(),
+                strip_components: 1,
+                archives: vec![SourceArchive {
+                    platform: "linux/amd64".to_string(),
+                    url: "https://example.com/openjdk.tar.gz".to_string(),
+                    sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                        .to_string(),
+                }],
+            }),
+            java: Some(JavaRuntime {
+                java_home: "/opt/java/openjdk".to_string(),
+                builder_packages: vec![
+                    "ca-certificates".to_string(),
+                    "gnupg".to_string(),
+                    "wget".to_string(),
+                ],
+                runtime_packages: vec![
+                    "binutils".to_string(),
+                    "ca-certificates".to_string(),
+                    "fontconfig".to_string(),
+                    "locales".to_string(),
+                    "tzdata".to_string(),
+                ],
+                lang: "en_US.UTF-8".to_string(),
+                language: "en_US:en".to_string(),
+                lc_all: "en_US.UTF-8".to_string(),
+                generate_locales: true,
+                verify_commands: vec![
+                    "java -Xshare:dump".to_string(),
+                    "java -version".to_string(),
+                    "javac --version".to_string(),
+                ],
+                trim_files: vec!["lib/src.zip".to_string()],
+            }),
+            definition_file: PathBuf::from("images/jdk/21/trixie/image.toml"),
+        };
+
+        let rendered = render(&target).unwrap();
+        let verify_pos = rendered.find("    javac --version\n\n").unwrap();
+        let arg_pos = rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap();
+
+        assert!(arg_pos > verify_pos);
     }
 }
