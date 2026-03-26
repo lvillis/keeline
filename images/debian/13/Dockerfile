@@ -41,7 +41,7 @@ RUN set -eux; \
 
 FROM docker.io/library/debian:13-slim AS healthcheck
 
-ENV SALUS_RELEASE=0.1.5
+ENV SALUS_RELEASE=0.1.6
 
 RUN set -eux; \
     apt-get update; \
@@ -55,12 +55,12 @@ RUN set -eux; \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
         amd64) \
-            ESUM='4c09ce0b84fbc64659d0ab7515e9b903ca7f76575a2f1190960bcbb4645b1435'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-x86_64-musl.tar.gz'; \
+            ESUM='7bb2d5f5563fb161665f0181230eb4ca95f9c91b963a907be51ecac5b77f6566'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-x86_64-musl.tar.gz'; \
             ;; \
         arm64) \
-            ESUM='c2e634dfb30463acc59ae29d688f4c045ffee7568cd5e510c144ba5231ad0f37'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.5/salus-0.1.5-linux-aarch64-musl.tar.gz'; \
+            ESUM='c8956206617dbe0d8982f0eb4f8f00e950fec69ab521ff70815b5751d8a7dd77'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-aarch64-musl.tar.gz'; \
             ;; \
         *) \
             echo "Unsupported arch: ${ARCH}"; \
@@ -70,7 +70,7 @@ RUN set -eux; \
     wget --progress=dot:giga -O /tmp/archive.tar.gz "${BINARY_URL}"; \
     echo "${ESUM} */tmp/archive.tar.gz" | sha256sum -c -; \
     mkdir -p /tmp/artifact /out; \
-    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 1 --no-same-owner; \
+    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 0 --no-same-owner; \
     cp /tmp/artifact/salus /out/salus; \
     chmod 0755 /out/salus; \
     rm -rf /tmp/artifact /tmp/archive.tar.gz

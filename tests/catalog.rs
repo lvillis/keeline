@@ -36,6 +36,7 @@ fn all_repository_images_declare_tino_init() {
         let healthcheck = target.healthcheck.as_ref().unwrap();
         assert_eq!(healthcheck.provider, "salus");
         assert_eq!(healthcheck.binary_path, "/bin/salus");
+        assert_eq!(healthcheck.strip_components, 0);
     }
 }
 
@@ -106,8 +107,9 @@ sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 [healthcheck]
 provider = "salus"
-release = "0.1.5"
+release = "0.1.6"
 binary_path = "/bin/salus"
+strip_components = 0
 
 [[healthcheck.archives]]
 platform = "linux/amd64"
