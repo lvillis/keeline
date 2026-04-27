@@ -25,7 +25,7 @@ flowchart LR
 
     subgraph Registry["Published packages"]
         G["ghcr.io/lvillis/keeline-debian"]
-        H["ghcr.io/lvillis/keeline-jdk"]
+        H["ghcr.io/lvillis/keeline-java"]
         I["ghcr.io/lvillis/keeline-scratch"]
     end
 
@@ -46,7 +46,7 @@ flowchart LR
 | Package | Example tags | Purpose |
 |---|---|---|
 | `ghcr.io/lvillis/keeline-debian` | `13`, `13-slim` | Debian 13 base images |
-| `ghcr.io/lvillis/keeline-jdk` | `17-trixie`, `21-trixie`, `8u372-trixie-slim` | Debian-based Java runtimes |
+| `ghcr.io/lvillis/keeline-java` | `jdk-17-trixie`, `jdk-21-trixie`, `jdk-8u372-trixie-slim` | Debian-based Java runtimes |
 | `ghcr.io/lvillis/keeline-scratch` | `1` | Minimal `FROM scratch` image with `tino` and `salus` |
 
 ## Tag Rules
@@ -54,7 +54,7 @@ flowchart LR
 - Package names express the image family.
 - Image tags express version and variant.
 - Debian tags use forms like `13` and `13-slim`.
-- JDK tags use forms like `21-trixie`, `21.0.10-trixie`, `8u372-trixie`, and `8u372-trixie-slim`.
+- Java tags include the runtime shape, with forms like `jdk-21-trixie`, `jdk-21.0.10-trixie`, `jdk-8u372-trixie`, and `jdk-8u372-trixie-slim`.
 - Scratch tags currently use `1`.
 - `latest` is not published.
 
@@ -64,8 +64,8 @@ Examples:
 
 ```bash
 docker pull ghcr.io/lvillis/keeline-debian:13
-docker pull ghcr.io/lvillis/keeline-jdk:21-trixie
-docker pull ghcr.io/lvillis/keeline-jdk:8u372-trixie
+docker pull ghcr.io/lvillis/keeline-java:jdk-21-trixie
+docker pull ghcr.io/lvillis/keeline-java:jdk-8u372-trixie
 docker pull ghcr.io/lvillis/keeline-scratch:1
 ```
 

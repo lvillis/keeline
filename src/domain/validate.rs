@@ -31,7 +31,9 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
-    let jdk_canonical = Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$")?;
+    let java_canonical = Regex::new(
+        r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
+    )?;
     let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$")?;
     let sha256_pattern = Regex::new(r"^[a-f0-9]{64}$")?;
 
@@ -125,7 +127,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
 
         match target.family.as_str() {
             "debian" => validate_debian_target(target)?,
-            "jdk" => validate_jdk_target(target, &sha256_pattern)?,
+            "java" => validate_java_target(target, &sha256_pattern)?,
             "scratch" => validate_scratch_target(target)?,
             _ => {
                 ensure!(
@@ -141,7 +143,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             target,
             &debian_canonical,
             &debian_alias,
-            &jdk_canonical,
+            &java_canonical,
             &generic_tag,
             &mut published_tags,
         )?;
@@ -342,71 +344,71 @@ fn validate_healthcheck_runtime(target: &ImageTarget, sha256_pattern: &Regex) ->
     Ok(())
 }
 
-fn validate_jdk_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
+fn validate_java_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
     let source = target
         .source
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("jdk image `{}` must declare a source", target.id))?;
+        .ok_or_else(|| anyhow::anyhow!("java image `{}` must declare a source", target.id))?;
     let java = target.java.as_ref().ok_or_else(|| {
         anyhow::anyhow!(
-            "jdk image `{}` must declare java runtime metadata",
+            "java image `{}` must declare java runtime metadata",
             target.id
         )
     })?;
 
     ensure!(
         source.provider == "adoptium-temurin",
-        "jdk image `{}` must use provider `adoptium-temurin`",
+        "java image `{}` must use provider `adoptium-temurin`",
         target.id
     );
     ensure!(
         !source.release.trim().is_empty(),
-        "jdk image `{}` must declare a source release",
+        "java image `{}` must declare a source release",
         target.id
     );
     ensure!(
         !source.gpg_key.trim().is_empty(),
-        "jdk image `{}` must declare a GPG key",
+        "java image `{}` must declare a GPG key",
         target.id
     );
     ensure!(
         !source.archives.is_empty(),
-        "jdk image `{}` must declare source archives",
+        "java image `{}` must declare source archives",
         target.id
     );
     ensure!(
         !java.java_home.trim().is_empty(),
-        "jdk image `{}` must declare JAVA_HOME",
+        "java image `{}` must declare JAVA_HOME",
         target.id
     );
     ensure!(
         !java.builder_packages.is_empty(),
-        "jdk image `{}` must declare builder packages",
+        "java image `{}` must declare builder packages",
         target.id
     );
     ensure!(
         !java.runtime_packages.is_empty(),
-        "jdk image `{}` must declare runtime packages",
+        "java image `{}` must declare runtime packages",
         target.id
     );
     ensure!(
         !java.lang.trim().is_empty(),
-        "jdk image `{}` must declare LANG",
+        "java image `{}` must declare LANG",
         target.id
     );
     ensure!(
         !java.language.trim().is_empty(),
-        "jdk image `{}` must declare LANGUAGE",
+        "java image `{}` must declare LANGUAGE",
         target.id
     );
     ensure!(
         !java.lc_all.trim().is_empty(),
-        "jdk image `{}` must declare LC_ALL",
+        "java image `{}` must declare LC_ALL",
         target.id
     );
     ensure!(
         !java.verify_commands.is_empty(),
-        "jdk image `{}` must declare verify commands",
+        "java image `{}` must declare verify commands",
         target.id
     );
     if java.generate_locales {
@@ -414,7 +416,7 @@ fn validate_jdk_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<(
             java.runtime_packages
                 .iter()
                 .any(|package| package == "locales"),
-            "jdk image `{}` generates locales but does not install `locales`",
+            "java image `{}` generates locales but does not install `locales`",
             target.id
         );
     }
@@ -424,25 +426,25 @@ fn validate_jdk_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<(
     for archive in &source.archives {
         ensure!(
             seen_archives.insert(archive.platform.clone()),
-            "jdk image `{}` repeats archive for platform `{}`",
+            "java image `{}` repeats archive for platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             target.platforms.contains(&archive.platform),
-            "jdk image `{}` declares archive for unsupported platform `{}`",
+            "java image `{}` declares archive for unsupported platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             archive.url.starts_with("https://"),
-            "jdk image `{}` archive URL must use https: {}",
+            "java image `{}` archive URL must use https: {}",
             target.id,
             archive.url
         );
         ensure!(
             sha256_pattern.is_match(&archive.sha256),
-            "jdk image `{}` archive checksum is invalid for platform `{}`",
+            "java image `{}` archive checksum is invalid for platform `{}`",
             target.id,
             archive.platform
         );
@@ -451,7 +453,7 @@ fn validate_jdk_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<(
     for platform in &target.platforms {
         ensure!(
             target.source_archive_for_platform(platform).is_some(),
-            "jdk image `{}` is missing a source archive for platform `{platform}`",
+            "java image `{}` is missing a source archive for platform `{platform}`",
             target.id
         );
     }
@@ -463,7 +465,7 @@ fn validate_tags(
     target: &ImageTarget,
     debian_canonical: &Regex,
     debian_alias: &Regex,
-    jdk_canonical: &Regex,
+    java_canonical: &Regex,
     generic_tag: &Regex,
     published_tags: &mut HashSet<(String, String)>,
 ) -> Result<()> {
@@ -487,9 +489,9 @@ fn validate_tags(
                 "debian image `{}` has invalid canonical tag `{tag}`",
                 target.id
             ),
-            "jdk" => ensure!(
-                jdk_canonical.is_match(tag),
-                "jdk image `{}` has invalid canonical tag `{tag}`",
+            "java" => ensure!(
+                java_canonical.is_match(tag),
+                "java image `{}` has invalid canonical tag `{tag}`",
                 target.id
             ),
             _ => ensure!(
@@ -524,9 +526,9 @@ fn validate_tags(
                 "debian image `{}` has invalid alias tag `{tag}`",
                 target.id
             ),
-            "jdk" => ensure!(
-                jdk_canonical.is_match(tag) || generic_tag.is_match(tag),
-                "jdk image `{}` has invalid alias tag `{tag}`",
+            "java" => ensure!(
+                java_canonical.is_match(tag) || generic_tag.is_match(tag),
+                "java image `{}` has invalid alias tag `{tag}`",
                 target.id
             ),
             _ => ensure!(
@@ -594,8 +596,10 @@ mod tests {
     fn accepts_debian_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let jdk_canonical =
-            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
+        let java_canonical = Regex::new(
+            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
+        )
+        .unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
@@ -604,7 +608,7 @@ mod tests {
             &target,
             &debian_canonical,
             &debian_alias,
-            &jdk_canonical,
+            &java_canonical,
             &generic_tag,
             &mut published,
         )
@@ -615,8 +619,10 @@ mod tests {
     fn rejects_banned_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let jdk_canonical =
-            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
+        let java_canonical = Regex::new(
+            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
+        )
+        .unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
@@ -626,7 +632,7 @@ mod tests {
                 &target,
                 &debian_canonical,
                 &debian_alias,
-                &jdk_canonical,
+                &java_canonical,
                 &generic_tag,
                 &mut published,
             )
@@ -638,17 +644,19 @@ mod tests {
     fn accepts_jdk_update_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let jdk_canonical =
-            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
+        let java_canonical = Regex::new(
+            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
+        )
+        .unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
-        let target = make_target("keeline-jdk", &["8u372-trixie"], &[]);
+        let target = make_target("keeline-java", &["jdk-8u372-trixie"], &[]);
         validate_tags(
             &target,
             &debian_canonical,
             &debian_alias,
-            &jdk_canonical,
+            &java_canonical,
             &generic_tag,
             &mut published,
         )

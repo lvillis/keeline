@@ -125,19 +125,19 @@ mod tests {
     #[test]
     fn display_includes_explicit_cache_options() {
         let request = DockerBuild {
-            context: PathBuf::from("images/jdk/21/trixie"),
-            dockerfile: PathBuf::from("images/jdk/21/trixie/Dockerfile"),
+            context: PathBuf::from("images/java/21/trixie"),
+            dockerfile: PathBuf::from("images/java/21/trixie/Dockerfile"),
             build_args: vec![(
                 "KEELINE_IMAGE_SOURCE".to_string(),
                 "https://example.com/repo".to_string(),
             )],
             cache_from: vec![
-                "type=registry,ref=ghcr.io/example/keeline-jdk:buildcache".to_string(),
+                "type=registry,ref=ghcr.io/example/keeline-java:buildcache".to_string(),
             ],
             cache_to: vec![
-                "type=registry,ref=ghcr.io/example/keeline-jdk:buildcache,mode=max".to_string(),
+                "type=registry,ref=ghcr.io/example/keeline-java:buildcache,mode=max".to_string(),
             ],
-            tags: vec!["ghcr.io/example/keeline-jdk:21-trixie".to_string()],
+            tags: vec!["ghcr.io/example/keeline-java:jdk-21-trixie".to_string()],
             platforms: vec!["linux/amd64".to_string(), "linux/arm64".to_string()],
             push: true,
             load: false,
@@ -146,10 +146,10 @@ mod tests {
         let display = request.display();
         assert!(
             display
-                .contains("--cache-from type=registry,ref=ghcr.io/example/keeline-jdk:buildcache")
+                .contains("--cache-from type=registry,ref=ghcr.io/example/keeline-java:buildcache")
         );
         assert!(display.contains(
-            "--cache-to type=registry,ref=ghcr.io/example/keeline-jdk:buildcache,mode=max"
+            "--cache-to type=registry,ref=ghcr.io/example/keeline-java:buildcache,mode=max"
         ));
     }
 }

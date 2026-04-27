@@ -35,7 +35,7 @@ pub struct SyncSummary {
 pub fn render(target: &ImageTarget) -> Result<String> {
     match target.family.as_str() {
         "debian" => render_debian(target),
-        "jdk" => render_jdk(target),
+        "java" => render_java(target),
         "scratch" => render_scratch(target),
         family => bail!("rendering is not implemented for family `{family}`"),
     }
@@ -171,7 +171,7 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
     Ok(output)
 }
 
-fn render_jdk(target: &ImageTarget) -> Result<String> {
+fn render_java(target: &ImageTarget) -> Result<String> {
     let init = target
         .init
         .as_ref()
@@ -183,11 +183,11 @@ fn render_jdk(target: &ImageTarget) -> Result<String> {
     let source = target
         .source
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("jdk image `{}` is missing source metadata", target.id))?;
+        .ok_or_else(|| anyhow::anyhow!("java image `{}` is missing source metadata", target.id))?;
     let java = target
         .java
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("jdk image `{}` is missing java metadata", target.id))?;
+        .ok_or_else(|| anyhow::anyhow!("java image `{}` is missing java metadata", target.id))?;
     let builder_image = effective_builder_image(target);
     let command = serde_json::to_string(&target.command)?;
     let trim_paths: Vec<String> = java
@@ -600,24 +600,24 @@ mod tests {
     fn places_label_args_after_runtime_verification_in_jdk_images() {
         let target = ImageTarget {
             schema: 1,
-            id: "jdk-21-trixie".to_string(),
-            family: "jdk".to_string(),
+            id: "java-jdk-21-trixie".to_string(),
+            family: "java".to_string(),
             line: "21".to_string(),
             version: "21.0.10".to_string(),
             distro: Some("trixie".to_string()),
-            package: "keeline-jdk".to_string(),
+            package: "keeline-java".to_string(),
             publish: true,
             status: ImageStatus::Stable,
             variant: "default".to_string(),
-            context: PathBuf::from("images/jdk/21/trixie"),
-            dockerfile: PathBuf::from("images/jdk/21/trixie/Dockerfile"),
+            context: PathBuf::from("images/java/21/trixie"),
+            dockerfile: PathBuf::from("images/java/21/trixie/Dockerfile"),
             platforms: vec!["linux/amd64".to_string()],
             base_image: "docker.io/library/debian:13".to_string(),
             builder_image: None,
             title: "Keeline JDK 21 Trixie".to_string(),
             description: "Keeline JDK 21.0.10 on Debian 13 (trixie)".to_string(),
             command: vec!["jshell".to_string()],
-            canonical_tags: vec!["21-trixie".to_string()],
+            canonical_tags: vec!["jdk-21-trixie".to_string()],
             alias_tags: vec![],
             init: Some(InitRuntime {
                 provider: "tino".to_string(),
@@ -688,7 +688,7 @@ mod tests {
                 ],
                 trim_files: vec!["lib/src.zip".to_string()],
             }),
-            definition_file: PathBuf::from("images/jdk/21/trixie/image.toml"),
+            definition_file: PathBuf::from("images/java/21/trixie/image.toml"),
         };
 
         let rendered = render(&target).unwrap();

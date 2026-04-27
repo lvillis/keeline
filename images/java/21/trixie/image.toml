@@ -1,10 +1,10 @@
 schema = 1
-family = "jdk"
-line = "8"
-version = "8u372"
+family = "java"
+line = "21"
+version = "21.0.10"
 distro = "trixie"
-id = "jdk-8u372-trixie"
-package = "keeline-jdk"
+id = "java-jdk-21-trixie"
+package = "keeline-java"
 publish = true
 status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
@@ -43,18 +43,18 @@ sha256 = "8b0d894ef7b6d7fe5bad61cc86322644fc2ea13c435cec565a8fd4e9666bf178"
 
 [source]
 provider = "adoptium-temurin"
-release = "jdk8u372-b07"
+release = "jdk-21.0.10+7"
 gpg_key = "3B04D753C9050D9A5D343F39843C48A565F8F04B"
 
 [[source.archives]]
 platform = "linux/amd64"
-url = "https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz"
-sha256 = "78a0b3547d6f3d46227f2ad8c774248425f20f1cd63f399b713f0cdde2cc376c"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz"
+sha256 = "ea3b9bd464d6dd253e9a7accf59f7ccd2a36e4aa69640b7251e3370caef896a4"
 
 [[source.archives]]
 platform = "linux/arm64"
-url = "https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz"
-sha256 = "195808eb42ab73535c84de05188914a52a47c1ac784e4bf66de95fe1fd315a5a"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.10_7.tar.gz"
+sha256 = "357fee29fb0d5c079f6730db98b28942df13a6eed426f6c61cd4ad703ab27b9a"
 
 [java]
 java_home = "/opt/java/openjdk"
@@ -64,28 +64,28 @@ lang = "en_US.UTF-8"
 language = "en_US:en"
 lc_all = "en_US.UTF-8"
 generate_locales = true
-verify_commands = ["java -Xshare:dump", "java -version", "javac -version"]
-trim_files = ["src.zip"]
+verify_commands = ["java -Xshare:dump", "java -version", "javac --version"]
+trim_files = ["lib/src.zip"]
 
 [[variants]]
 name = "default"
 dockerfile = "Dockerfile"
 base_image = "docker.io/library/debian:13"
-title = "Keeline JDK 8u372 Trixie"
-description = "Keeline JDK 8u372 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs"
-command = ["sh"]
-canonical = ["8u372-trixie"]
+title = "Keeline JDK 21 Trixie"
+description = "Keeline JDK 21.0.10 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs"
+command = ["jshell"]
+canonical = ["jdk-21-trixie", "jdk-21.0.10-trixie"]
 
 [[variants]]
 name = "slim"
 dockerfile = "slim.Dockerfile"
 base_image = "docker.io/library/debian:13-slim"
-title = "Keeline JDK 8u372 Trixie Slim"
-description = "Keeline JDK 8u372 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs"
-command = ["sh"]
+title = "Keeline JDK 21 Trixie Slim"
+description = "Keeline JDK 21.0.10 on Debian 13 (trixie) slim, sourced from Adoptium Temurin release tarballs"
+command = ["jshell"]
 runtime_packages = ["binutils", "ca-certificates", "tzdata"]
 lang = "C.UTF-8"
 language = "C.UTF-8"
 lc_all = "C.UTF-8"
 generate_locales = false
-canonical = ["8u372-trixie-slim"]
+canonical = ["jdk-21-trixie-slim", "jdk-21.0.10-trixie-slim"]

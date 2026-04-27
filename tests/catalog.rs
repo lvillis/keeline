@@ -44,22 +44,22 @@ fn all_repository_images_declare_tino_init() {
 fn rendered_images_include_tino_entrypoint() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
     let debian = catalog.target("debian-13").unwrap();
-    let jdk = catalog.target("jdk-21-trixie").unwrap();
+    let java = catalog.target("java-jdk-21-trixie").unwrap();
     let scratch = catalog.target("scratch-1").unwrap();
 
     let debian_rendered = render::render(debian).unwrap();
-    let jdk_rendered = render::render(jdk).unwrap();
+    let java_rendered = render::render(java).unwrap();
     let scratch_rendered = render::render(scratch).unwrap();
 
     assert!(debian_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
     assert!(debian_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
     assert!(debian_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
-    assert!(jdk_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
-    assert!(jdk_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
-    assert!(jdk_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
+    assert!(java_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
+    assert!(java_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
+    assert!(java_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
     assert!(
-        jdk_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
-            > jdk_rendered.find("    javac --version\n\n").unwrap()
+        java_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
+            > java_rendered.find("    javac --version\n\n").unwrap()
     );
     assert!(scratch_rendered.contains("FROM scratch"));
     assert!(scratch_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
@@ -70,7 +70,7 @@ fn rendered_images_include_tino_entrypoint() {
 #[test]
 fn jdk_slim_targets_override_runtime_packages_and_locale_defaults() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
-    let target = catalog.target("jdk-21-trixie-slim").unwrap();
+    let target = catalog.target("java-jdk-21-trixie-slim").unwrap();
     let java = target.java.as_ref().unwrap();
 
     assert_eq!(
