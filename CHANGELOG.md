@@ -7,6 +7,10 @@
 ### ⚡ Performance
 
 - Improve buildx cache reuse for image releases
+
+### ⚙️ Miscellaneous Tasks
+
+- Release keeline version 0.1.4
 ## [0.1.3] - 2026-03-26
 
 ### ⚙️ Miscellaneous Tasks
