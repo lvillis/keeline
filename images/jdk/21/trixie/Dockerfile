@@ -5,7 +5,7 @@
 
 FROM docker.io/library/debian:13-slim AS init
 
-ENV TINO_RELEASE=0.1.16
+ENV TINO_RELEASE=0.1.25
 
 RUN set -eux; \
     apt-get update; \
@@ -19,12 +19,12 @@ RUN set -eux; \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
         amd64) \
-            ESUM='b4b3414c417c7859652463e25e288843f61fd2f4bfbe23b115589be033a922e6'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-x86_64-musl.tar.gz'; \
+            ESUM='f2684fbf500d67fad8e02186ffc08f41ed80bdbf831b53079fe3a12dbde86159'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-x86_64-musl.tar.gz'; \
             ;; \
         arm64) \
-            ESUM='a53821da990cae1bd5f5ea9620d731fd1b607c9224433411f360b37f604c5c4b'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-aarch64-musl.tar.gz'; \
+            ESUM='6966d3d40045bd58cb546fc458ee4c5131a334bdc4eaf41710d2f5e42ec12c0c'; \
+            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-aarch64-musl.tar.gz'; \
             ;; \
         *) \
             echo "Unsupported arch: ${ARCH}"; \
@@ -41,7 +41,7 @@ RUN set -eux; \
 
 FROM docker.io/library/debian:13-slim AS healthcheck
 
-ENV SALUS_RELEASE=0.1.6
+ENV SALUS_RELEASE=0.1.8
 
 RUN set -eux; \
     apt-get update; \
@@ -55,12 +55,12 @@ RUN set -eux; \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
         amd64) \
-            ESUM='7bb2d5f5563fb161665f0181230eb4ca95f9c91b963a907be51ecac5b77f6566'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-x86_64-musl.tar.gz'; \
+            ESUM='2af11032e063b7d03795e04c8f8cf3c8c741e9a7935bde1ae4e61d9339f837ee'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-x86_64-musl.tar.gz'; \
             ;; \
         arm64) \
-            ESUM='c8956206617dbe0d8982f0eb4f8f00e950fec69ab521ff70815b5751d8a7dd77'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-aarch64-musl.tar.gz'; \
+            ESUM='8b0d894ef7b6d7fe5bad61cc86322644fc2ea13c435cec565a8fd4e9666bf178'; \
+            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-aarch64-musl.tar.gz'; \
             ;; \
         *) \
             echo "Unsupported arch: ${ARCH}"; \

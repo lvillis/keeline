@@ -106,7 +106,7 @@ platforms = ["linux/amd64"]
 
 [init]
 provider = "tino"
-release = "0.1.16"
+release = "0.1.25"
 binary_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
@@ -117,7 +117,7 @@ sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 [healthcheck]
 provider = "salus"
-release = "0.1.6"
+release = "0.1.8"
 binary_path = "/bin/salus"
 strip_components = 0
 

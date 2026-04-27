@@ -621,7 +621,7 @@ mod tests {
             alias_tags: vec![],
             init: Some(InitRuntime {
                 provider: "tino".to_string(),
-                release: "0.1.16".to_string(),
+                release: "0.1.25".to_string(),
                 binary_path: "/sbin/tino".to_string(),
                 install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
                 strip_components: 1,
@@ -640,7 +640,7 @@ mod tests {
             }),
             healthcheck: Some(HealthcheckRuntime {
                 provider: "salus".to_string(),
-                release: "0.1.6".to_string(),
+                release: "0.1.8".to_string(),
                 binary_path: "/bin/salus".to_string(),
                 install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
                 strip_components: 0,

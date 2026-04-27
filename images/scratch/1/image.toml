@@ -10,35 +10,35 @@ platforms = ["linux/amd64", "linux/arm64"]
 
 [init]
 provider = "tino"
-release = "0.1.16"
+release = "0.1.25"
 binary_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
 [[init.archives]]
 platform = "linux/amd64"
-url = "https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-x86_64-musl.tar.gz"
-sha256 = "b4b3414c417c7859652463e25e288843f61fd2f4bfbe23b115589be033a922e6"
+url = "https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-x86_64-musl.tar.gz"
+sha256 = "f2684fbf500d67fad8e02186ffc08f41ed80bdbf831b53079fe3a12dbde86159"
 
 [[init.archives]]
 platform = "linux/arm64"
-url = "https://github.com/lvillis/tino/releases/download/0.1.16/tino-0.1.16-linux-aarch64-musl.tar.gz"
-sha256 = "a53821da990cae1bd5f5ea9620d731fd1b607c9224433411f360b37f604c5c4b"
+url = "https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-aarch64-musl.tar.gz"
+sha256 = "6966d3d40045bd58cb546fc458ee4c5131a334bdc4eaf41710d2f5e42ec12c0c"
 
 [healthcheck]
 provider = "salus"
-release = "0.1.6"
+release = "0.1.8"
 binary_path = "/bin/salus"
 strip_components = 0
 
 [[healthcheck.archives]]
 platform = "linux/amd64"
-url = "https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-x86_64-musl.tar.gz"
-sha256 = "7bb2d5f5563fb161665f0181230eb4ca95f9c91b963a907be51ecac5b77f6566"
+url = "https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-x86_64-musl.tar.gz"
+sha256 = "2af11032e063b7d03795e04c8f8cf3c8c741e9a7935bde1ae4e61d9339f837ee"
 
 [[healthcheck.archives]]
 platform = "linux/arm64"
-url = "https://github.com/lvillis/salus-rs/releases/download/0.1.6/salus-0.1.6-linux-aarch64-musl.tar.gz"
-sha256 = "c8956206617dbe0d8982f0eb4f8f00e950fec69ab521ff70815b5751d8a7dd77"
+url = "https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-aarch64-musl.tar.gz"
+sha256 = "8b0d894ef7b6d7fe5bad61cc86322644fc2ea13c435cec565a8fd4e9666bf178"
 
 [[variants]]
 name = "default"

@@ -4,25 +4,50 @@ Keeline provides Debian-based runtime images and a minimal scratch tool image
 published to GHCR, with `tino` integrated as the default PID 1 init process
 and `salus` bundled for health checks across the image line.
 
+## Flow
+
+```mermaid
+flowchart LR
+    subgraph Metadata["Image metadata"]
+        A["images/.../image.toml"]
+    end
+
+    subgraph CLI["keeline CLI"]
+        B["list / matrix"]
+        C["render"]
+        D["verify"]
+        E["release"]
+    end
+
+    subgraph Generated["Generated outputs"]
+        F["Dockerfile / slim.Dockerfile"]
+    end
+
+    subgraph Registry["Published packages"]
+        G["ghcr.io/lvillis/keeline-debian"]
+        H["ghcr.io/lvillis/keeline-jdk"]
+        I["ghcr.io/lvillis/keeline-scratch"]
+    end
+
+    A --> B
+    A --> C
+    A --> D
+    C --> F
+    A --> E
+    F --> D
+    F --> E
+    E --> G
+    E --> H
+    E --> I
+```
+
 ## Images
 
-Current image packages:
-
-- `ghcr.io/lvillis/keeline-debian`
-- `ghcr.io/lvillis/keeline-jdk`
-- `ghcr.io/lvillis/keeline-scratch`
-
-Current published image lines:
-
-- `ghcr.io/lvillis/keeline-debian:13`
-- `ghcr.io/lvillis/keeline-debian:13-slim`
-- `ghcr.io/lvillis/keeline-jdk:17-trixie`
-- `ghcr.io/lvillis/keeline-jdk:17-trixie-slim`
-- `ghcr.io/lvillis/keeline-jdk:21-trixie`
-- `ghcr.io/lvillis/keeline-jdk:21-trixie-slim`
-- `ghcr.io/lvillis/keeline-jdk:8u372-trixie`
-- `ghcr.io/lvillis/keeline-jdk:8u372-trixie-slim`
-- `ghcr.io/lvillis/keeline-scratch:1`
+| Package | Example tags | Purpose |
+|---|---|---|
+| `ghcr.io/lvillis/keeline-debian` | `13`, `13-slim` | Debian 13 base images |
+| `ghcr.io/lvillis/keeline-jdk` | `17-trixie`, `21-trixie`, `8u372-trixie-slim` | Debian-based Java runtimes |
+| `ghcr.io/lvillis/keeline-scratch` | `1` | Minimal `FROM scratch` image with `tino` and `salus` |
 
 ## Tag Rules
 
