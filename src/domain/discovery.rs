@@ -45,6 +45,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
         let init = definition.init.as_ref().map(|init| InitRuntime {
             provider: init.provider.clone(),
             release: init.release.clone(),
+            image: init.image.clone(),
             binary_path: init.binary_path.clone(),
             install_packages: init.install_packages.clone(),
             strip_components: init.strip_components,
@@ -65,6 +66,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
             .map(|healthcheck| HealthcheckRuntime {
                 provider: healthcheck.provider.clone(),
                 release: healthcheck.release.clone(),
+                image: healthcheck.image.clone(),
                 binary_path: healthcheck.binary_path.clone(),
                 install_packages: healthcheck.install_packages.clone(),
                 strip_components: healthcheck.strip_components,

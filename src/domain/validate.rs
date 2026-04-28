@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::{Result, bail, ensure};
 use regex::Regex;
 
-use crate::domain::model::{ImageCatalog, ImageTarget};
+use crate::domain::model::{ImageCatalog, ImageTarget, SourceArchive};
 
 const BANNED_TAGS: &[&str] = &[
     "latest",
@@ -27,7 +27,8 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
 
     let package_pattern = Regex::new(r"^keeline-[a-z0-9-]+$")?;
     let family_pattern = Regex::new(r"^[a-z0-9]+$")?;
-    let image_reference_pattern = Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+)$")?;
+    let image_reference_pattern =
+        Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")?;
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
@@ -122,8 +123,8 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             );
         }
 
-        validate_init_runtime(target, &sha256_pattern)?;
-        validate_healthcheck_runtime(target, &sha256_pattern)?;
+        validate_init_runtime(target, &image_reference_pattern, &sha256_pattern)?;
+        validate_healthcheck_runtime(target, &image_reference_pattern, &sha256_pattern)?;
 
         match target.family.as_str() {
             "debian" => validate_debian_target(target)?,
@@ -192,7 +193,11 @@ fn validate_scratch_target(target: &ImageTarget) -> Result<()> {
     Ok(())
 }
 
-fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
+fn validate_init_runtime(
+    target: &ImageTarget,
+    image_reference_pattern: &Regex,
+    sha256_pattern: &Regex,
+) -> Result<()> {
     let init = target
         .init
         .as_ref()
@@ -214,11 +219,6 @@ fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result
         target.id
     );
     ensure!(
-        !init.install_packages.is_empty(),
-        "image `{}` must declare init install packages",
-        target.id
-    );
-    ensure!(
         !init.entrypoint.is_empty(),
         "image `{}` must declare an init entrypoint",
         target.id
@@ -229,35 +229,82 @@ fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result
         target.id,
         init.binary_path
     );
+    validate_tool_source(
+        target,
+        "init",
+        init.image.as_deref(),
+        &init.install_packages,
+        &init.archives,
+        image_reference_pattern,
+        sha256_pattern,
+    )?;
+
+    Ok(())
+}
+
+fn validate_tool_source(
+    target: &ImageTarget,
+    kind: &str,
+    image: Option<&str>,
+    install_packages: &[String],
+    archives: &[SourceArchive],
+    image_reference_pattern: &Regex,
+    sha256_pattern: &Regex,
+) -> Result<()> {
     ensure!(
-        !init.archives.is_empty(),
-        "image `{}` must declare init archives",
+        image.is_some() || !archives.is_empty(),
+        "image `{}` must declare either a {kind} image or {kind} archives",
+        target.id
+    );
+    ensure!(
+        image.is_none() || archives.is_empty(),
+        "image `{}` cannot declare both a {kind} image and {kind} archives",
+        target.id
+    );
+
+    if let Some(image) = image {
+        ensure!(
+            image_reference_pattern.is_match(image),
+            "image `{}` declares invalid {kind} image `{image}`",
+            target.id
+        );
+        ensure!(
+            image.contains("@sha256:"),
+            "image `{}` {kind} image must be pinned by digest",
+            target.id
+        );
+        return Ok(());
+    }
+
+    ensure!(
+        !install_packages.is_empty(),
+        "image `{}` must declare {kind} install packages",
         target.id
     );
 
     let mut seen_archives = HashSet::new();
-    for archive in &init.archives {
+    for archive in archives {
         ensure!(
             seen_archives.insert(archive.platform.clone()),
-            "image `{}` repeats init archive for platform `{}`",
+            "image `{}` repeats {kind} archive for platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             target.platforms.contains(&archive.platform),
-            "image `{}` declares init archive for unsupported platform `{}`",
+            "image `{}` declares {kind} archive for unsupported platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             archive.url.starts_with("https://"),
-            "image `{}` init archive URL must use https: {}",
+            "image `{}` {kind} archive URL must use https: {}",
             target.id,
             archive.url
         );
         ensure!(
             sha256_pattern.is_match(&archive.sha256),
-            "image `{}` init archive checksum is invalid for platform `{}`",
+            "image `{}` {kind} archive checksum is invalid for platform `{}`",
             target.id,
             archive.platform
         );
@@ -265,8 +312,8 @@ fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result
 
     for platform in &target.platforms {
         ensure!(
-            target.init_archive_for_platform(platform).is_some(),
-            "image `{}` is missing an init archive for platform `{platform}`",
+            archives.iter().any(|archive| archive.platform == *platform),
+            "image `{}` is missing a {kind} archive for platform `{platform}`",
             target.id
         );
     }
@@ -274,7 +321,11 @@ fn validate_init_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result
     Ok(())
 }
 
-fn validate_healthcheck_runtime(target: &ImageTarget, sha256_pattern: &Regex) -> Result<()> {
+fn validate_healthcheck_runtime(
+    target: &ImageTarget,
+    image_reference_pattern: &Regex,
+    sha256_pattern: &Regex,
+) -> Result<()> {
     let healthcheck = target.healthcheck.as_ref().ok_or_else(|| {
         anyhow::anyhow!("image `{}` must declare healthcheck metadata", target.id)
     })?;
@@ -294,52 +345,15 @@ fn validate_healthcheck_runtime(target: &ImageTarget, sha256_pattern: &Regex) ->
         "image `{}` must declare an absolute healthcheck binary path",
         target.id
     );
-    ensure!(
-        !healthcheck.install_packages.is_empty(),
-        "image `{}` must declare healthcheck install packages",
-        target.id
-    );
-    ensure!(
-        !healthcheck.archives.is_empty(),
-        "image `{}` must declare healthcheck archives",
-        target.id
-    );
-
-    let mut seen_archives = HashSet::new();
-    for archive in &healthcheck.archives {
-        ensure!(
-            seen_archives.insert(archive.platform.clone()),
-            "image `{}` repeats healthcheck archive for platform `{}`",
-            target.id,
-            archive.platform
-        );
-        ensure!(
-            target.platforms.contains(&archive.platform),
-            "image `{}` declares healthcheck archive for unsupported platform `{}`",
-            target.id,
-            archive.platform
-        );
-        ensure!(
-            archive.url.starts_with("https://"),
-            "image `{}` healthcheck archive URL must use https: {}",
-            target.id,
-            archive.url
-        );
-        ensure!(
-            sha256_pattern.is_match(&archive.sha256),
-            "image `{}` healthcheck archive checksum is invalid for platform `{}`",
-            target.id,
-            archive.platform
-        );
-    }
-
-    for platform in &target.platforms {
-        ensure!(
-            target.healthcheck_archive_for_platform(platform).is_some(),
-            "image `{}` is missing a healthcheck archive for platform `{platform}`",
-            target.id
-        );
-    }
+    validate_tool_source(
+        target,
+        "healthcheck",
+        healthcheck.image.as_deref(),
+        &healthcheck.install_packages,
+        &healthcheck.archives,
+        image_reference_pattern,
+        sha256_pattern,
+    )?;
 
     Ok(())
 }
@@ -559,8 +573,8 @@ fn validate_tags(
 mod tests {
     use regex::Regex;
 
-    use super::validate_tags;
-    use crate::domain::model::ImageTarget;
+    use super::{validate_tags, validate_tool_source};
+    use crate::domain::model::{ImageTarget, SourceArchive};
 
     fn make_target(package: &str, canonical: &[&str], alias: &[&str]) -> ImageTarget {
         ImageTarget {
@@ -661,5 +675,51 @@ mod tests {
             &mut published,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn accepts_digest_pinned_tool_source_images() {
+        let target = make_target("keeline-debian", &["13"], &[]);
+        let image_reference =
+            Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")
+                .unwrap();
+        let sha256 = Regex::new(r"^[a-f0-9]{64}$").unwrap();
+        let archives: Vec<SourceArchive> = Vec::new();
+
+        validate_tool_source(
+            &target,
+            "init",
+            Some(
+                "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b",
+            ),
+            &[],
+            &archives,
+            &image_reference,
+            &sha256,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_mutable_tool_source_images() {
+        let target = make_target("keeline-debian", &["13"], &[]);
+        let image_reference =
+            Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")
+                .unwrap();
+        let sha256 = Regex::new(r"^[a-f0-9]{64}$").unwrap();
+        let archives: Vec<SourceArchive> = Vec::new();
+
+        assert!(
+            validate_tool_source(
+                &target,
+                "init",
+                Some("ghcr.io/lvillis/tino:0.1.26"),
+                &[],
+                &archives,
+                &image_reference,
+                &sha256,
+            )
+            .is_err()
+        );
     }
 }

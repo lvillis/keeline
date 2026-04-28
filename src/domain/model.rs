@@ -60,6 +60,8 @@ pub struct RawSourceArchive {
 pub struct RawInitRuntime {
     pub provider: String,
     pub release: String,
+    #[serde(default)]
+    pub image: Option<String>,
     pub binary_path: String,
     #[serde(default = "default_download_install_packages")]
     pub install_packages: Vec<String>,
@@ -74,6 +76,8 @@ pub struct RawInitRuntime {
 pub struct RawHealthcheckRuntime {
     pub provider: String,
     pub release: String,
+    #[serde(default)]
+    pub image: Option<String>,
     pub binary_path: String,
     #[serde(default = "default_download_install_packages")]
     pub install_packages: Vec<String>,
@@ -151,6 +155,7 @@ pub struct SourceArchive {
 pub struct InitRuntime {
     pub provider: String,
     pub release: String,
+    pub image: Option<String>,
     pub binary_path: String,
     pub install_packages: Vec<String>,
     pub strip_components: u8,
@@ -162,6 +167,7 @@ pub struct InitRuntime {
 pub struct HealthcheckRuntime {
     pub provider: String,
     pub release: String,
+    pub image: Option<String>,
     pub binary_path: String,
     pub install_packages: Vec<String>,
     pub strip_components: u8,

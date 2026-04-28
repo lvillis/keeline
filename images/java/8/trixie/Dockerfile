@@ -3,77 +3,9 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
-FROM docker.io/library/debian:13-slim AS init
+FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS init
 
-ENV TINO_RELEASE=0.1.25
-
-RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        wget \
-    ; \
-    rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
-    ARCH="$(dpkg --print-architecture)"; \
-    case "${ARCH}" in \
-        amd64) \
-            ESUM='f2684fbf500d67fad8e02186ffc08f41ed80bdbf831b53079fe3a12dbde86159'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-x86_64-musl.tar.gz'; \
-            ;; \
-        arm64) \
-            ESUM='6966d3d40045bd58cb546fc458ee4c5131a334bdc4eaf41710d2f5e42ec12c0c'; \
-            BINARY_URL='https://github.com/lvillis/tino/releases/download/0.1.25/tino-0.1.25-linux-aarch64-musl.tar.gz'; \
-            ;; \
-        *) \
-            echo "Unsupported arch: ${ARCH}"; \
-            exit 1; \
-            ;; \
-    esac; \
-    wget --progress=dot:giga -O /tmp/archive.tar.gz "${BINARY_URL}"; \
-    echo "${ESUM} */tmp/archive.tar.gz" | sha256sum -c -; \
-    mkdir -p /tmp/artifact /out; \
-    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 1 --no-same-owner; \
-    cp /tmp/artifact/tino /out/tino; \
-    chmod 0755 /out/tino; \
-    rm -rf /tmp/artifact /tmp/archive.tar.gz
-
-FROM docker.io/library/debian:13-slim AS healthcheck
-
-ENV SALUS_RELEASE=0.1.8
-
-RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        wget \
-    ; \
-    rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
-    ARCH="$(dpkg --print-architecture)"; \
-    case "${ARCH}" in \
-        amd64) \
-            ESUM='2af11032e063b7d03795e04c8f8cf3c8c741e9a7935bde1ae4e61d9339f837ee'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-x86_64-musl.tar.gz'; \
-            ;; \
-        arm64) \
-            ESUM='8b0d894ef7b6d7fe5bad61cc86322644fc2ea13c435cec565a8fd4e9666bf178'; \
-            BINARY_URL='https://github.com/lvillis/salus-rs/releases/download/0.1.8/salus-0.1.8-linux-aarch64-musl.tar.gz'; \
-            ;; \
-        *) \
-            echo "Unsupported arch: ${ARCH}"; \
-            exit 1; \
-            ;; \
-    esac; \
-    wget --progress=dot:giga -O /tmp/archive.tar.gz "${BINARY_URL}"; \
-    echo "${ESUM} */tmp/archive.tar.gz" | sha256sum -c -; \
-    mkdir -p /tmp/artifact /out; \
-    tar --extract --file /tmp/archive.tar.gz --directory /tmp/artifact --strip-components 0 --no-same-owner; \
-    cp /tmp/artifact/salus /out/salus; \
-    chmod 0755 /out/salus; \
-    rm -rf /tmp/artifact /tmp/archive.tar.gz
+FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS healthcheck
 
 FROM docker.io/library/debian:13-slim AS source
 
@@ -138,8 +70,8 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=source /opt/java/openjdk /opt/java/openjdk
-COPY --from=init /out/tino /sbin/tino
-COPY --from=healthcheck /out/salus /bin/salus
+COPY --from=init /sbin/tino /sbin/tino
+COPY --from=healthcheck /bin/salus /bin/salus
 
 RUN set -eux; \
     find "$JAVA_HOME/lib" -name '*.so' -exec dirname '{}' ';' | sort -u > /etc/ld.so.conf.d/docker-openjdk.conf; \

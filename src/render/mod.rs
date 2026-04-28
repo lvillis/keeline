@@ -11,6 +11,7 @@ struct BinaryStageSpec<'a> {
     stage_name: &'a str,
     release_var_name: &'a str,
     release: &'a str,
+    source_image: Option<&'a str>,
     binary_path: &'a str,
     install_packages: &'a [String],
     strip_components: u8,
@@ -127,6 +128,7 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
             stage_name: "init",
             release_var_name: "TINO_RELEASE",
             release: init.release.as_str(),
+            source_image: init.image.as_deref(),
             binary_path: init.binary_path.as_str(),
             install_packages: &init.install_packages,
             strip_components: init.strip_components,
@@ -140,6 +142,7 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
             stage_name: "healthcheck",
             release_var_name: "SALUS_RELEASE",
             release: healthcheck.release.as_str(),
+            source_image: healthcheck.image.as_deref(),
             binary_path: healthcheck.binary_path.as_str(),
             install_packages: &healthcheck.install_packages,
             strip_components: healthcheck.strip_components,
@@ -151,14 +154,14 @@ fn render_debian(target: &ImageTarget) -> Result<String> {
     output.push('\n');
     writeln!(
         output,
-        "COPY --from=init /out/{} {}",
-        archive_binary_name(&init.binary_path)?,
+        "COPY --from=init {} {}",
+        binary_stage_source_path(init.image.as_deref(), &init.binary_path)?,
         init.binary_path
     )?;
     writeln!(
         output,
-        "COPY --from=healthcheck /out/{} {}",
-        archive_binary_name(&healthcheck.binary_path)?,
+        "COPY --from=healthcheck {} {}",
+        binary_stage_source_path(healthcheck.image.as_deref(), &healthcheck.binary_path)?,
         healthcheck.binary_path
     )?;
     writeln!(output)?;
@@ -205,6 +208,7 @@ fn render_java(target: &ImageTarget) -> Result<String> {
             stage_name: "init",
             release_var_name: "TINO_RELEASE",
             release: init.release.as_str(),
+            source_image: init.image.as_deref(),
             binary_path: init.binary_path.as_str(),
             install_packages: &init.install_packages,
             strip_components: init.strip_components,
@@ -218,6 +222,7 @@ fn render_java(target: &ImageTarget) -> Result<String> {
             stage_name: "healthcheck",
             release_var_name: "SALUS_RELEASE",
             release: healthcheck.release.as_str(),
+            source_image: healthcheck.image.as_deref(),
             binary_path: healthcheck.binary_path.as_str(),
             install_packages: &healthcheck.install_packages,
             strip_components: healthcheck.strip_components,
@@ -279,14 +284,14 @@ fn render_java(target: &ImageTarget) -> Result<String> {
     )?;
     writeln!(
         output,
-        "COPY --from=init /out/{} {}",
-        archive_binary_name(&init.binary_path)?,
+        "COPY --from=init {} {}",
+        binary_stage_source_path(init.image.as_deref(), &init.binary_path)?,
         init.binary_path
     )?;
     writeln!(
         output,
-        "COPY --from=healthcheck /out/{} {}",
-        archive_binary_name(&healthcheck.binary_path)?,
+        "COPY --from=healthcheck {} {}",
+        binary_stage_source_path(healthcheck.image.as_deref(), &healthcheck.binary_path)?,
         healthcheck.binary_path
     )?;
     writeln!(output)?;
@@ -344,6 +349,7 @@ fn render_scratch(target: &ImageTarget) -> Result<String> {
             stage_name: "init",
             release_var_name: "TINO_RELEASE",
             release: init.release.as_str(),
+            source_image: init.image.as_deref(),
             binary_path: init.binary_path.as_str(),
             install_packages: &init.install_packages,
             strip_components: init.strip_components,
@@ -357,6 +363,7 @@ fn render_scratch(target: &ImageTarget) -> Result<String> {
             stage_name: "healthcheck",
             release_var_name: "SALUS_RELEASE",
             release: healthcheck.release.as_str(),
+            source_image: healthcheck.image.as_deref(),
             binary_path: healthcheck.binary_path.as_str(),
             install_packages: &healthcheck.install_packages,
             strip_components: healthcheck.strip_components,
@@ -368,14 +375,14 @@ fn render_scratch(target: &ImageTarget) -> Result<String> {
     writeln!(output)?;
     writeln!(
         output,
-        "COPY --from=init /out/{} {}",
-        archive_binary_name(&init.binary_path)?,
+        "COPY --from=init {} {}",
+        binary_stage_source_path(init.image.as_deref(), &init.binary_path)?,
         init.binary_path
     )?;
     writeln!(
         output,
-        "COPY --from=healthcheck /out/{} {}",
-        archive_binary_name(&healthcheck.binary_path)?,
+        "COPY --from=healthcheck {} {}",
+        binary_stage_source_path(healthcheck.image.as_deref(), &healthcheck.binary_path)?,
         healthcheck.binary_path
     )?;
     writeln!(output)?;
@@ -389,6 +396,12 @@ fn render_scratch(target: &ImageTarget) -> Result<String> {
 }
 
 fn append_binary_stage(output: &mut String, spec: BinaryStageSpec<'_>) -> Result<()> {
+    if let Some(source_image) = spec.source_image {
+        writeln!(output, "FROM {source_image} AS {}", spec.stage_name)?;
+        writeln!(output)?;
+        return Ok(());
+    }
+
     let case_statement = render_archive_case_statement(spec.archives)?;
     let archive_name = archive_binary_name(spec.binary_path)?;
 
@@ -561,6 +574,14 @@ fn archive_binary_name(binary_path: &str) -> Result<&str> {
         .ok_or_else(|| anyhow::anyhow!("binary path `{binary_path}` must end with a file name"))
 }
 
+fn binary_stage_source_path(source_image: Option<&str>, binary_path: &str) -> Result<String> {
+    if source_image.is_some() {
+        return Ok(binary_path.to_string());
+    }
+
+    Ok(format!("/out/{}", archive_binary_name(binary_path)?))
+}
+
 fn docker_escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -621,9 +642,13 @@ mod tests {
             alias_tags: vec![],
             init: Some(InitRuntime {
                 provider: "tino".to_string(),
-                release: "0.1.25".to_string(),
+                release: "0.1.26".to_string(),
+                image: Some(
+                    "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
+                        .to_string(),
+                ),
                 binary_path: "/sbin/tino".to_string(),
-                install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
+                install_packages: vec![],
                 strip_components: 1,
                 entrypoint: vec![
                     "/sbin/tino".to_string(),
@@ -631,25 +656,19 @@ mod tests {
                     "-s".to_string(),
                     "--".to_string(),
                 ],
-                archives: vec![SourceArchive {
-                    platform: "linux/amd64".to_string(),
-                    url: "https://example.com/tino.tar.gz".to_string(),
-                    sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                        .to_string(),
-                }],
+                archives: vec![],
             }),
             healthcheck: Some(HealthcheckRuntime {
                 provider: "salus".to_string(),
                 release: "0.1.8".to_string(),
-                binary_path: "/bin/salus".to_string(),
-                install_packages: vec!["ca-certificates".to_string(), "wget".to_string()],
-                strip_components: 0,
-                archives: vec![SourceArchive {
-                    platform: "linux/amd64".to_string(),
-                    url: "https://example.com/salus.tar.gz".to_string(),
-                    sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                image: Some(
+                    "ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568"
                         .to_string(),
-                }],
+                ),
+                binary_path: "/bin/salus".to_string(),
+                install_packages: vec![],
+                strip_components: 0,
+                archives: vec![],
             }),
             source: Some(crate::domain::ImageSource {
                 provider: "adoptium".to_string(),

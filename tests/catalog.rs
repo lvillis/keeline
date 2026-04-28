@@ -30,13 +30,25 @@ fn all_repository_images_declare_tino_init() {
     for target in &catalog.targets {
         let init = target.init.as_ref().unwrap();
         assert_eq!(init.provider, "tino");
+        assert!(
+            init.image
+                .as_deref()
+                .unwrap()
+                .starts_with("ghcr.io/lvillis/tino:")
+        );
         assert_eq!(init.binary_path, "/sbin/tino");
         assert_eq!(init.entrypoint, vec!["/sbin/tino", "-g", "-s", "--"]);
 
         let healthcheck = target.healthcheck.as_ref().unwrap();
         assert_eq!(healthcheck.provider, "salus");
+        assert!(
+            healthcheck
+                .image
+                .as_deref()
+                .unwrap()
+                .starts_with("ghcr.io/lvillis/salus:")
+        );
         assert_eq!(healthcheck.binary_path, "/bin/salus");
-        assert_eq!(healthcheck.strip_components, 0);
     }
 }
 
@@ -51,19 +63,21 @@ fn rendered_images_include_tino_entrypoint() {
     let java_rendered = render::render(java).unwrap();
     let scratch_rendered = render::render(scratch).unwrap();
 
-    assert!(debian_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
-    assert!(debian_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS init"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS healthcheck"));
+    assert!(debian_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
+    assert!(debian_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
     assert!(debian_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
-    assert!(java_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
-    assert!(java_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
+    assert!(java_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
+    assert!(java_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
     assert!(java_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
     assert!(
         java_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
             > java_rendered.find("    javac --version\n\n").unwrap()
     );
     assert!(scratch_rendered.contains("FROM scratch"));
-    assert!(scratch_rendered.contains("COPY --from=init /out/tino /sbin/tino"));
-    assert!(scratch_rendered.contains("COPY --from=healthcheck /out/salus /bin/salus"));
+    assert!(scratch_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
+    assert!(scratch_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
     assert!(scratch_rendered.contains("CMD [\"/bin/salus\",\"--version\"]"));
 }
 
@@ -106,25 +120,16 @@ platforms = ["linux/amd64"]
 
 [init]
 provider = "tino"
-release = "0.1.25"
+release = "0.1.26"
+image = "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
 binary_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
-
-[[init.archives]]
-platform = "linux/amd64"
-url = "https://example.com/tino.tar.gz"
-sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 [healthcheck]
 provider = "salus"
 release = "0.1.8"
+image = "ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568"
 binary_path = "/bin/salus"
-strip_components = 0
-
-[[healthcheck.archives]]
-platform = "linux/amd64"
-url = "https://example.com/salus.tar.gz"
-sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 [[variants]]
 name = "default"
