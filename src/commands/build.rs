@@ -26,8 +26,11 @@ pub fn run(catalog: &ImageCatalog, args: &BuildArgs) -> Result<()> {
         build_args: build_args(),
         cache_from: Vec::new(),
         cache_to: Vec::new(),
+        metadata_file: None,
         tags: vec![format!("{repository}:{}", target.primary_tag())],
         platforms: args.platform.clone().into_iter().collect(),
+        sbom: false,
+        provenance: false,
         push: false,
         load: true,
     };

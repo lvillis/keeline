@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
+use std::{fs, path::Path};
 
 use anyhow::{Context, Result, bail};
 
@@ -10,8 +11,11 @@ pub struct DockerBuild {
     pub build_args: Vec<(String, String)>,
     pub cache_from: Vec<String>,
     pub cache_to: Vec<String>,
+    pub metadata_file: Option<PathBuf>,
     pub tags: Vec<String>,
     pub platforms: Vec<String>,
+    pub sbom: bool,
+    pub provenance: bool,
     pub push: bool,
     pub load: bool,
 }
@@ -42,9 +46,22 @@ impl DockerBuild {
             parts.push(cache_to.clone());
         }
 
+        if let Some(metadata_file) = &self.metadata_file {
+            parts.push("--metadata-file".to_string());
+            parts.push(metadata_file.display().to_string());
+        }
+
         if !self.platforms.is_empty() {
             parts.push("--platform".to_string());
             parts.push(self.platforms.join(","));
+        }
+
+        if self.sbom {
+            parts.push("--sbom=true".to_string());
+        }
+
+        if self.provenance {
+            parts.push("--provenance=true".to_string());
         }
 
         for tag in &self.tags {
@@ -70,6 +87,10 @@ impl DockerBuild {
             bail!("docker build request cannot use both --push and --load");
         }
 
+        if let Some(metadata_file) = &self.metadata_file {
+            create_parent_dir(metadata_file)?;
+        }
+
         let mut command = Command::new("docker");
         command.arg("buildx").arg("build");
         command.arg("--file").arg(&self.dockerfile);
@@ -86,8 +107,20 @@ impl DockerBuild {
             command.arg("--cache-to").arg(cache_to);
         }
 
+        if let Some(metadata_file) = &self.metadata_file {
+            command.arg("--metadata-file").arg(metadata_file);
+        }
+
         if !self.platforms.is_empty() {
             command.arg("--platform").arg(self.platforms.join(","));
+        }
+
+        if self.sbom {
+            command.arg("--sbom=true");
+        }
+
+        if self.provenance {
+            command.arg("--provenance=true");
         }
 
         for tag in &self.tags {
@@ -116,6 +149,17 @@ impl DockerBuild {
     }
 }
 
+fn create_parent_dir(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -137,8 +181,11 @@ mod tests {
             cache_to: vec![
                 "type=registry,ref=ghcr.io/example/keeline-java:buildcache,mode=max".to_string(),
             ],
+            metadata_file: Some(PathBuf::from("target/keeline-release-metadata/sample.json")),
             tags: vec!["ghcr.io/example/keeline-java:jdk-21-trixie".to_string()],
             platforms: vec!["linux/amd64".to_string(), "linux/arm64".to_string()],
+            sbom: true,
+            provenance: true,
             push: true,
             load: false,
         };
@@ -151,5 +198,8 @@ mod tests {
         assert!(display.contains(
             "--cache-to type=registry,ref=ghcr.io/example/keeline-java:buildcache,mode=max"
         ));
+        assert!(display.contains("--metadata-file target/keeline-release-metadata/sample.json"));
+        assert!(display.contains("--sbom=true"));
+        assert!(display.contains("--provenance=true"));
     }
 }

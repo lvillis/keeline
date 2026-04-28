@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{Context, Result, ensure};
 
 use crate::cli::ReleaseArgs;
@@ -47,8 +49,11 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
             build_args: build_args(),
             cache_from: registry_cache_from(&repository),
             cache_to: registry_cache_to(&repository),
+            metadata_file: Some(metadata_file(target)),
             tags,
             platforms: target.platforms.clone(),
+            sbom: true,
+            provenance: true,
             push: true,
             load: false,
         };
@@ -62,4 +67,10 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn metadata_file(target: &ImageTarget) -> PathBuf {
+    PathBuf::from("target")
+        .join("keeline-release-metadata")
+        .join(format!("{}.json", target.id))
 }

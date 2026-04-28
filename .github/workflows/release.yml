@@ -92,3 +92,11 @@ jobs:
           KEELINE_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
           KEELINE_IMAGE_REVISION: ${{ github.sha }}
         run: cargo run --quiet -- release "${{ matrix.id }}" --owner "${{ github.repository_owner }}"
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: image-metadata-${{ matrix.id }}
+          path: target/keeline-release-metadata/${{ matrix.id }}.json
+          if-no-files-found: error
+          retention-days: 30
