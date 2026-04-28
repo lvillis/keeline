@@ -2,7 +2,7 @@
 
 Keeline provides Debian-based runtime images and a minimal scratch tool image
 published to GHCR, with `tino` integrated as the default PID 1 init process
-and `salus` bundled for health checks across the image line.
+plus `salus` and `motdyn` bundled as runtime utilities across the image line.
 
 ## Flow
 
@@ -47,7 +47,7 @@ flowchart LR
 |---|---|---|
 | `ghcr.io/lvillis/keeline-debian` | `13`, `13-slim` | Debian 13 base images |
 | `ghcr.io/lvillis/keeline-java` | `jdk-17-trixie`, `jdk-21-trixie`, `jdk-8u372-trixie-slim` | Debian-based Java runtimes |
-| `ghcr.io/lvillis/keeline-scratch` | `1` | Minimal `FROM scratch` image with `tino` and `salus` |
+| `ghcr.io/lvillis/keeline-scratch` | `1` | Minimal `FROM scratch` image with `tino`, `salus`, and `motdyn` |
 
 ## Tag Rules
 
@@ -75,8 +75,9 @@ For strongly reproducible deployments, pin by digest.
 
 - Debian images provide a clean Debian 13 base.
 - JDK images provide Debian 13 based Java runtimes built for stable consumption.
-- Scratch images provide a minimal `FROM scratch` base containing only `tino` and `salus`.
+- Scratch images provide a minimal `FROM scratch` base containing only the bundled runtime tools.
 - All images include `tino` at `/sbin/tino` and start through `ENTRYPOINT ["/sbin/tino", "-g", "-s", "--"]`.
 - All images include `salus` at `/bin/salus` for downstream `HEALTHCHECK` and Kubernetes `exec` probes.
+- All images include `motdyn` slim at `/usr/local/bin/motdyn` for lightweight startup or MOTD-style template rendering.
 - JDK `slim` images reduce runtime packages and use `C.UTF-8` instead of generated `en_US.UTF-8` locales.
 - The project keeps image families separate instead of mixing them into one package with complex tags.

@@ -8,18 +8,27 @@ publish = true
 status = "stable"
 platforms = ["linux/amd64", "linux/arm64"]
 
-[init]
-provider = "tino"
+[tools.tino]
+role = "init"
 release = "0.1.26"
 image = "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
-binary_path = "/sbin/tino"
+source_path = "/sbin/tino"
+target_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
-[healthcheck]
-provider = "salus"
+[tools.salus]
+role = "healthcheck"
 release = "0.1.8"
 image = "ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568"
-binary_path = "/bin/salus"
+source_path = "/bin/salus"
+target_path = "/bin/salus"
+
+[tools.motdyn]
+role = "motd"
+release = "1.0.13"
+image = "ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b"
+source_path = "/usr/local/bin/motdyn"
+target_path = "/usr/local/bin/motdyn"
 
 [[variants]]
 name = "default"
@@ -27,6 +36,6 @@ dockerfile = "Dockerfile"
 base_image = "scratch"
 builder_image = "docker.io/library/debian:13-slim"
 title = "Keeline Scratch 1"
-description = "Keeline scratch base image with tino and salus"
+description = "Keeline scratch base image with tino, salus, and motdyn"
 command = ["/bin/salus", "--version"]
 canonical = ["1"]

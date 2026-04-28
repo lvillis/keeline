@@ -3,9 +3,11 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
-FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS init
+FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS tino
 
-FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS healthcheck
+FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS salus
+
+FROM ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b AS motdyn
 
 FROM docker.io/library/debian:13-slim AS source
 
@@ -70,8 +72,9 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=source /opt/java/openjdk /opt/java/openjdk
-COPY --from=init /sbin/tino /sbin/tino
-COPY --from=healthcheck /bin/salus /bin/salus
+COPY --from=tino /sbin/tino /sbin/tino
+COPY --from=salus /bin/salus /bin/salus
+COPY --from=motdyn /usr/local/bin/motdyn /usr/local/bin/motdyn
 
 RUN set -eux; \
     find "$JAVA_HOME/lib" -name '*.so' -exec dirname '{}' ';' | sort -u > /etc/ld.so.conf.d/docker-openjdk.conf; \

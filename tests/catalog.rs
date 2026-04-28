@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use keeline::domain::ImageCatalog;
+use keeline::domain::{ImageCatalog, ToolRole};
 use keeline::render;
 
 #[test]
@@ -24,23 +24,23 @@ fn keeps_rendered_dockerfiles_in_sync() {
 }
 
 #[test]
-fn all_repository_images_declare_tino_init() {
+fn all_repository_images_declare_runtime_tools() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
 
     for target in &catalog.targets {
-        let init = target.init.as_ref().unwrap();
-        assert_eq!(init.provider, "tino");
+        let init = target.tool_by_role(ToolRole::Init).unwrap();
+        assert_eq!(init.name, "tino");
         assert!(
             init.image
                 .as_deref()
                 .unwrap()
                 .starts_with("ghcr.io/lvillis/tino:")
         );
-        assert_eq!(init.binary_path, "/sbin/tino");
+        assert_eq!(init.target_path, "/sbin/tino");
         assert_eq!(init.entrypoint, vec!["/sbin/tino", "-g", "-s", "--"]);
 
-        let healthcheck = target.healthcheck.as_ref().unwrap();
-        assert_eq!(healthcheck.provider, "salus");
+        let healthcheck = target.tool_by_role(ToolRole::Healthcheck).unwrap();
+        assert_eq!(healthcheck.name, "salus");
         assert!(
             healthcheck
                 .image
@@ -48,12 +48,22 @@ fn all_repository_images_declare_tino_init() {
                 .unwrap()
                 .starts_with("ghcr.io/lvillis/salus:")
         );
-        assert_eq!(healthcheck.binary_path, "/bin/salus");
+        assert_eq!(healthcheck.target_path, "/bin/salus");
+
+        let motd = target.tool_by_role(ToolRole::Motd).unwrap();
+        assert_eq!(motd.name, "motdyn");
+        assert!(
+            motd.image
+                .as_deref()
+                .unwrap()
+                .starts_with("ghcr.io/lvillis/motdyn:")
+        );
+        assert_eq!(motd.target_path, "/usr/local/bin/motdyn");
     }
 }
 
 #[test]
-fn rendered_images_include_tino_entrypoint() {
+fn rendered_images_include_bundled_tools() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
     let debian = catalog.target("debian-13").unwrap();
     let java = catalog.target("java-jdk-21-trixie").unwrap();
@@ -63,21 +73,31 @@ fn rendered_images_include_tino_entrypoint() {
     let java_rendered = render::render(java).unwrap();
     let scratch_rendered = render::render(scratch).unwrap();
 
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS init"));
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS healthcheck"));
-    assert!(debian_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
-    assert!(debian_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS tino"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS salus"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b AS motdyn"));
+    assert!(debian_rendered.contains("COPY --from=tino /sbin/tino /sbin/tino"));
+    assert!(debian_rendered.contains("COPY --from=salus /bin/salus /bin/salus"));
+    assert!(
+        debian_rendered.contains("COPY --from=motdyn /usr/local/bin/motdyn /usr/local/bin/motdyn")
+    );
     assert!(debian_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
-    assert!(java_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
-    assert!(java_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
+    assert!(java_rendered.contains("COPY --from=tino /sbin/tino /sbin/tino"));
+    assert!(java_rendered.contains("COPY --from=salus /bin/salus /bin/salus"));
+    assert!(
+        java_rendered.contains("COPY --from=motdyn /usr/local/bin/motdyn /usr/local/bin/motdyn")
+    );
     assert!(java_rendered.contains("ENTRYPOINT [\"/sbin/tino\",\"-g\",\"-s\",\"--\"]"));
     assert!(
         java_rendered.find("ARG KEELINE_IMAGE_SOURCE=").unwrap()
             > java_rendered.find("    javac --version\n\n").unwrap()
     );
     assert!(scratch_rendered.contains("FROM scratch"));
-    assert!(scratch_rendered.contains("COPY --from=init /sbin/tino /sbin/tino"));
-    assert!(scratch_rendered.contains("COPY --from=healthcheck /bin/salus /bin/salus"));
+    assert!(scratch_rendered.contains("COPY --from=tino /sbin/tino /sbin/tino"));
+    assert!(scratch_rendered.contains("COPY --from=salus /bin/salus /bin/salus"));
+    assert!(
+        scratch_rendered.contains("COPY --from=motdyn /usr/local/bin/motdyn /usr/local/bin/motdyn")
+    );
     assert!(scratch_rendered.contains("CMD [\"/bin/salus\",\"--version\"]"));
 }
 
@@ -118,18 +138,27 @@ id = "debian-13"
 package = "keeline-debian"
 platforms = ["linux/amd64"]
 
-[init]
-provider = "tino"
+[tools.tino]
+role = "init"
 release = "0.1.26"
 image = "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
-binary_path = "/sbin/tino"
+source_path = "/sbin/tino"
+target_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
-[healthcheck]
-provider = "salus"
+[tools.salus]
+role = "healthcheck"
 release = "0.1.8"
 image = "ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568"
-binary_path = "/bin/salus"
+source_path = "/bin/salus"
+target_path = "/bin/salus"
+
+[tools.motdyn]
+role = "motd"
+release = "1.0.13"
+image = "ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b"
+source_path = "/usr/local/bin/motdyn"
+target_path = "/usr/local/bin/motdyn"
 
 [[variants]]
 name = "default"

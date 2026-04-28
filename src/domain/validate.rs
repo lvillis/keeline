@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::{Result, bail, ensure};
 use regex::Regex;
 
-use crate::domain::model::{ImageCatalog, ImageTarget, SourceArchive};
+use crate::domain::model::{ImageCatalog, ImageTarget, SourceArchive, ToolRole, ToolRuntime};
 
 const BANNED_TAGS: &[&str] = &[
     "latest",
@@ -27,6 +27,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
 
     let package_pattern = Regex::new(r"^keeline-[a-z0-9-]+$")?;
     let family_pattern = Regex::new(r"^[a-z0-9]+$")?;
+    let tool_name_pattern = Regex::new(r"^[a-z][a-z0-9-]*$")?;
     let image_reference_pattern =
         Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")?;
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
@@ -123,8 +124,12 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             );
         }
 
-        validate_init_runtime(target, &image_reference_pattern, &sha256_pattern)?;
-        validate_healthcheck_runtime(target, &image_reference_pattern, &sha256_pattern)?;
+        validate_tools(
+            target,
+            &tool_name_pattern,
+            &image_reference_pattern,
+            &sha256_pattern,
+        )?;
 
         match target.family.as_str() {
             "debian" => validate_debian_target(target)?,
@@ -193,58 +198,127 @@ fn validate_scratch_target(target: &ImageTarget) -> Result<()> {
     Ok(())
 }
 
-fn validate_init_runtime(
+fn validate_tools(
     target: &ImageTarget,
+    tool_name_pattern: &Regex,
     image_reference_pattern: &Regex,
     sha256_pattern: &Regex,
 ) -> Result<()> {
-    let init = target
-        .init
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("image `{}` must declare init metadata", target.id))?;
+    ensure!(
+        !target.tools.is_empty(),
+        "image `{}` must declare tools metadata",
+        target.id
+    );
 
+    let mut names = HashSet::new();
+    for tool in &target.tools {
+        ensure!(
+            names.insert(tool.name.clone()),
+            "image `{}` repeats tool `{}`",
+            target.id,
+            tool.name
+        );
+        ensure!(
+            tool_name_pattern.is_match(&tool.name),
+            "image `{}` declares invalid tool name `{}`",
+            target.id,
+            tool.name
+        );
+        ensure!(
+            tool.name != "source",
+            "image `{}` cannot use reserved tool name `source`",
+            target.id
+        );
+        ensure!(
+            !tool.release.trim().is_empty(),
+            "image `{}` tool `{}` must declare a release",
+            target.id,
+            tool.name
+        );
+        ensure!(
+            tool.source_path.starts_with('/'),
+            "image `{}` tool `{}` must declare an absolute source path",
+            target.id,
+            tool.name
+        );
+        ensure!(
+            tool.target_path.starts_with('/'),
+            "image `{}` tool `{}` must declare an absolute target path",
+            target.id,
+            tool.name
+        );
+
+        validate_tool_source(
+            target,
+            &tool.name,
+            tool.image.as_deref(),
+            &tool.install_packages,
+            &tool.archives,
+            image_reference_pattern,
+            sha256_pattern,
+        )?;
+
+        match tool.role {
+            ToolRole::Init => {
+                ensure!(
+                    !tool.entrypoint.is_empty(),
+                    "image `{}` init tool `{}` must declare an entrypoint",
+                    target.id,
+                    tool.name
+                );
+                ensure!(
+                    tool.entrypoint[0] == tool.target_path,
+                    "image `{}` init tool `{}` entrypoint must start with `{}`",
+                    target.id,
+                    tool.name,
+                    tool.target_path
+                );
+            }
+            ToolRole::Healthcheck | ToolRole::Motd | ToolRole::Utility => {
+                ensure!(
+                    tool.entrypoint.is_empty(),
+                    "image `{}` non-init tool `{}` cannot declare an entrypoint",
+                    target.id,
+                    tool.name
+                );
+            }
+        }
+    }
+
+    validate_required_tool(target, ToolRole::Init, "tino")?;
+    validate_required_tool(target, ToolRole::Healthcheck, "salus")?;
+    validate_required_tool(target, ToolRole::Motd, "motdyn")?;
+
+    Ok(())
+}
+
+fn validate_required_tool(target: &ImageTarget, role: ToolRole, expected_name: &str) -> Result<()> {
+    let tools: Vec<&ToolRuntime> = target
+        .tools
+        .iter()
+        .filter(|tool| tool.role == role)
+        .collect();
     ensure!(
-        init.provider == "tino",
-        "image `{}` must use init provider `tino`",
-        target.id
-    );
-    ensure!(
-        !init.release.trim().is_empty(),
-        "image `{}` must declare an init release",
-        target.id
-    );
-    ensure!(
-        init.binary_path.starts_with('/'),
-        "image `{}` must declare an absolute init binary path",
-        target.id
-    );
-    ensure!(
-        !init.entrypoint.is_empty(),
-        "image `{}` must declare an init entrypoint",
-        target.id
-    );
-    ensure!(
-        init.entrypoint[0] == init.binary_path,
-        "image `{}` init entrypoint must start with `{}`",
+        tools.len() == 1,
+        "image `{}` must declare exactly one {} tool",
         target.id,
-        init.binary_path
+        role.as_str()
     );
-    validate_tool_source(
-        target,
-        "init",
-        init.image.as_deref(),
-        &init.install_packages,
-        &init.archives,
-        image_reference_pattern,
-        sha256_pattern,
-    )?;
+    let tool = tools[0];
+    ensure!(
+        tool.name == expected_name,
+        "image `{}` {} tool must be `{}`",
+        target.id,
+        role.as_str(),
+        expected_name
+    );
 
     Ok(())
 }
 
 fn validate_tool_source(
     target: &ImageTarget,
-    kind: &str,
+    tool_name: &str,
     image: Option<&str>,
     install_packages: &[String],
     archives: &[SourceArchive],
@@ -253,24 +327,24 @@ fn validate_tool_source(
 ) -> Result<()> {
     ensure!(
         image.is_some() || !archives.is_empty(),
-        "image `{}` must declare either a {kind} image or {kind} archives",
+        "image `{}` tool `{tool_name}` must declare either an image or archives",
         target.id
     );
     ensure!(
         image.is_none() || archives.is_empty(),
-        "image `{}` cannot declare both a {kind} image and {kind} archives",
+        "image `{}` tool `{tool_name}` cannot declare both an image and archives",
         target.id
     );
 
     if let Some(image) = image {
         ensure!(
             image_reference_pattern.is_match(image),
-            "image `{}` declares invalid {kind} image `{image}`",
+            "image `{}` tool `{tool_name}` declares invalid image `{image}`",
             target.id
         );
         ensure!(
             image.contains("@sha256:"),
-            "image `{}` {kind} image must be pinned by digest",
+            "image `{}` tool `{tool_name}` image must be pinned by digest",
             target.id
         );
         return Ok(());
@@ -278,7 +352,7 @@ fn validate_tool_source(
 
     ensure!(
         !install_packages.is_empty(),
-        "image `{}` must declare {kind} install packages",
+        "image `{}` tool `{tool_name}` must declare install packages",
         target.id
     );
 
@@ -286,25 +360,25 @@ fn validate_tool_source(
     for archive in archives {
         ensure!(
             seen_archives.insert(archive.platform.clone()),
-            "image `{}` repeats {kind} archive for platform `{}`",
+            "image `{}` tool `{tool_name}` repeats archive for platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             target.platforms.contains(&archive.platform),
-            "image `{}` declares {kind} archive for unsupported platform `{}`",
+            "image `{}` tool `{tool_name}` declares archive for unsupported platform `{}`",
             target.id,
             archive.platform
         );
         ensure!(
             archive.url.starts_with("https://"),
-            "image `{}` {kind} archive URL must use https: {}",
+            "image `{}` tool `{tool_name}` archive URL must use https: {}",
             target.id,
             archive.url
         );
         ensure!(
             sha256_pattern.is_match(&archive.sha256),
-            "image `{}` {kind} archive checksum is invalid for platform `{}`",
+            "image `{}` tool `{tool_name}` archive checksum is invalid for platform `{}`",
             target.id,
             archive.platform
         );
@@ -313,47 +387,10 @@ fn validate_tool_source(
     for platform in &target.platforms {
         ensure!(
             archives.iter().any(|archive| archive.platform == *platform),
-            "image `{}` is missing a {kind} archive for platform `{platform}`",
+            "image `{}` tool `{tool_name}` is missing an archive for platform `{platform}`",
             target.id
         );
     }
-
-    Ok(())
-}
-
-fn validate_healthcheck_runtime(
-    target: &ImageTarget,
-    image_reference_pattern: &Regex,
-    sha256_pattern: &Regex,
-) -> Result<()> {
-    let healthcheck = target.healthcheck.as_ref().ok_or_else(|| {
-        anyhow::anyhow!("image `{}` must declare healthcheck metadata", target.id)
-    })?;
-
-    ensure!(
-        healthcheck.provider == "salus",
-        "image `{}` must use healthcheck provider `salus`",
-        target.id
-    );
-    ensure!(
-        !healthcheck.release.trim().is_empty(),
-        "image `{}` must declare a healthcheck release",
-        target.id
-    );
-    ensure!(
-        healthcheck.binary_path.starts_with('/'),
-        "image `{}` must declare an absolute healthcheck binary path",
-        target.id
-    );
-    validate_tool_source(
-        target,
-        "healthcheck",
-        healthcheck.image.as_deref(),
-        &healthcheck.install_packages,
-        &healthcheck.archives,
-        image_reference_pattern,
-        sha256_pattern,
-    )?;
 
     Ok(())
 }
@@ -598,8 +635,7 @@ mod tests {
             command: vec!["bash".to_string()],
             canonical_tags: canonical.iter().map(|value| value.to_string()).collect(),
             alias_tags: alias.iter().map(|value| value.to_string()).collect(),
-            init: None,
-            healthcheck: None,
+            tools: Vec::new(),
             source: None,
             java: None,
             definition_file: "images/sample/image.toml".into(),

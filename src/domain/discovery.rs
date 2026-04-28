@@ -5,8 +5,8 @@ use anyhow::{Context, Result};
 use walkdir::WalkDir;
 
 use crate::domain::model::{
-    HealthcheckRuntime, ImageCatalog, ImageSource, ImageTarget, InitRuntime, JavaRuntime,
-    RawImageDefinition, SourceArchive,
+    ImageCatalog, ImageSource, ImageTarget, JavaRuntime, RawImageDefinition, SourceArchive,
+    ToolRuntime,
 };
 
 pub fn discover(root: &Path) -> Result<ImageCatalog> {
@@ -42,35 +42,20 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 })
                 .collect(),
         });
-        let init = definition.init.as_ref().map(|init| InitRuntime {
-            provider: init.provider.clone(),
-            release: init.release.clone(),
-            image: init.image.clone(),
-            binary_path: init.binary_path.clone(),
-            install_packages: init.install_packages.clone(),
-            strip_components: init.strip_components,
-            entrypoint: init.entrypoint.clone(),
-            archives: init
-                .archives
-                .iter()
-                .map(|archive| SourceArchive {
-                    platform: archive.platform.clone(),
-                    url: archive.url.clone(),
-                    sha256: archive.sha256.clone(),
-                })
-                .collect(),
-        });
-        let healthcheck = definition
-            .healthcheck
-            .as_ref()
-            .map(|healthcheck| HealthcheckRuntime {
-                provider: healthcheck.provider.clone(),
-                release: healthcheck.release.clone(),
-                image: healthcheck.image.clone(),
-                binary_path: healthcheck.binary_path.clone(),
-                install_packages: healthcheck.install_packages.clone(),
-                strip_components: healthcheck.strip_components,
-                archives: healthcheck
+        let mut tools: Vec<ToolRuntime> = definition
+            .tools
+            .iter()
+            .map(|(name, tool)| ToolRuntime {
+                name: name.clone(),
+                role: tool.role,
+                release: tool.release.clone(),
+                image: tool.image.clone(),
+                source_path: tool.source_path.clone(),
+                target_path: tool.target_path.clone(),
+                install_packages: tool.install_packages.clone(),
+                strip_components: tool.strip_components,
+                entrypoint: tool.entrypoint.clone(),
+                archives: tool
                     .archives
                     .iter()
                     .map(|archive| SourceArchive {
@@ -79,7 +64,14 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                         sha256: archive.sha256.clone(),
                     })
                     .collect(),
-            });
+            })
+            .collect();
+        tools.sort_by(|left, right| {
+            left.role
+                .sort_order()
+                .cmp(&right.role.sort_order())
+                .then_with(|| left.name.cmp(&right.name))
+        });
         let java = definition.java.as_ref().map(|java| JavaRuntime {
             java_home: java.java_home.clone(),
             builder_packages: java.builder_packages.clone(),
@@ -138,8 +130,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 command: variant.command,
                 canonical_tags: variant.canonical,
                 alias_tags: variant.alias,
-                init: init.clone(),
-                healthcheck: healthcheck.clone(),
+                tools: tools.clone(),
                 source: source.clone(),
                 java: variant_java,
                 definition_file: definition_file.clone(),

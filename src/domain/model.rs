@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -27,9 +28,7 @@ pub struct RawImageDefinition {
     pub status: ImageStatus,
     pub platforms: Vec<String>,
     #[serde(default)]
-    pub init: Option<RawInitRuntime>,
-    #[serde(default)]
-    pub healthcheck: Option<RawHealthcheckRuntime>,
+    pub tools: BTreeMap<String, RawTool>,
     #[serde(default)]
     pub source: Option<RawSource>,
     #[serde(default)]
@@ -56,33 +55,30 @@ pub struct RawSourceArchive {
     pub sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct RawInitRuntime {
-    pub provider: String,
-    pub release: String,
-    #[serde(default)]
-    pub image: Option<String>,
-    pub binary_path: String,
-    #[serde(default = "default_download_install_packages")]
-    pub install_packages: Vec<String>,
-    #[serde(default = "default_strip_components")]
-    pub strip_components: u8,
-    pub entrypoint: Vec<String>,
-    #[serde(default)]
-    pub archives: Vec<RawSourceArchive>,
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ToolRole {
+    Init,
+    Healthcheck,
+    Motd,
+    Utility,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct RawHealthcheckRuntime {
-    pub provider: String,
+pub struct RawTool {
+    #[serde(default = "default_tool_role")]
+    pub role: ToolRole,
     pub release: String,
     #[serde(default)]
     pub image: Option<String>,
-    pub binary_path: String,
-    #[serde(default = "default_download_install_packages")]
+    pub source_path: String,
+    pub target_path: String,
+    #[serde(default)]
     pub install_packages: Vec<String>,
     #[serde(default = "default_strip_components")]
     pub strip_components: u8,
+    #[serde(default)]
+    pub entrypoint: Vec<String>,
     #[serde(default)]
     pub archives: Vec<RawSourceArchive>,
 }
@@ -152,25 +148,16 @@ pub struct SourceArchive {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct InitRuntime {
-    pub provider: String,
+pub struct ToolRuntime {
+    pub name: String,
+    pub role: ToolRole,
     pub release: String,
     pub image: Option<String>,
-    pub binary_path: String,
+    pub source_path: String,
+    pub target_path: String,
     pub install_packages: Vec<String>,
     pub strip_components: u8,
     pub entrypoint: Vec<String>,
-    pub archives: Vec<SourceArchive>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct HealthcheckRuntime {
-    pub provider: String,
-    pub release: String,
-    pub image: Option<String>,
-    pub binary_path: String,
-    pub install_packages: Vec<String>,
-    pub strip_components: u8,
     pub archives: Vec<SourceArchive>,
 }
 
@@ -209,8 +196,7 @@ pub struct ImageTarget {
     pub command: Vec<String>,
     pub canonical_tags: Vec<String>,
     pub alias_tags: Vec<String>,
-    pub init: Option<InitRuntime>,
-    pub healthcheck: Option<HealthcheckRuntime>,
+    pub tools: Vec<ToolRuntime>,
     pub source: Option<ImageSource>,
     pub java: Option<JavaRuntime>,
     pub definition_file: PathBuf,
@@ -279,20 +265,12 @@ impl ImageTarget {
             .find(|archive| archive.platform == platform)
     }
 
-    pub fn init_archive_for_platform(&self, platform: &str) -> Option<&SourceArchive> {
-        self.init
-            .as_ref()?
-            .archives
-            .iter()
-            .find(|archive| archive.platform == platform)
+    pub fn tool_by_role(&self, role: ToolRole) -> Option<&ToolRuntime> {
+        self.tools.iter().find(|tool| tool.role == role)
     }
 
-    pub fn healthcheck_archive_for_platform(&self, platform: &str) -> Option<&SourceArchive> {
-        self.healthcheck
-            .as_ref()?
-            .archives
-            .iter()
-            .find(|archive| archive.platform == platform)
+    pub fn tool(&self, name: &str) -> Option<&ToolRuntime> {
+        self.tools.iter().find(|tool| tool.name == name)
     }
 
     pub fn is_releasable(&self) -> bool {
@@ -316,6 +294,10 @@ pub fn default_strip_components() -> u8 {
     1
 }
 
+pub fn default_tool_role() -> ToolRole {
+    ToolRole::Utility
+}
+
 pub fn default_lang() -> String {
     "en_US.UTF-8".to_string()
 }
@@ -332,10 +314,6 @@ pub fn default_generate_locales() -> bool {
     true
 }
 
-pub fn default_download_install_packages() -> Vec<String> {
-    vec!["ca-certificates".to_string(), "wget".to_string()]
-}
-
 pub fn default_publish() -> bool {
     true
 }
@@ -350,6 +328,26 @@ impl ImageStatus {
             Self::Stable => "stable",
             Self::Experimental => "experimental",
             Self::Disabled => "disabled",
+        }
+    }
+}
+
+impl ToolRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Init => "init",
+            Self::Healthcheck => "healthcheck",
+            Self::Motd => "motd",
+            Self::Utility => "utility",
+        }
+    }
+
+    pub fn sort_order(self) -> u8 {
+        match self {
+            Self::Init => 0,
+            Self::Healthcheck => 1,
+            Self::Motd => 2,
+            Self::Utility => 3,
         }
     }
 }
@@ -380,8 +378,7 @@ mod tests {
             command: vec!["jshell".to_string()],
             canonical_tags: vec!["jdk-21-trixie".to_string()],
             alias_tags: Vec::new(),
-            init: None,
-            healthcheck: None,
+            tools: Vec::new(),
             source: None,
             java: None,
             definition_file: "images/java/21/trixie/image.toml".into(),

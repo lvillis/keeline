@@ -10,10 +10,12 @@ Rust CLI.
 - Each image context must include an `image.toml`. That file defines package
   metadata, tags, upstream tarballs, checksums, variant settings, and release
   state.
-- Each image definition also declares an `[init]` block. Keeline currently uses
-  `tino` as the default PID 1 init process for every published image.
-- Each image definition also declares a `[healthcheck]` block. Keeline currently
-  uses `salus` as the bundled health check binary for every published image.
+- Each image definition declares bundled runtime tools under `[tools.*]`.
+  `role = "init"` drives the image entrypoint, `role = "healthcheck"` marks
+  the health probe helper, and `role = "motd"` provides startup or MOTD-style
+  template rendering.
+- Keeline currently bundles `tino`, `salus`, and `motdyn` in every published
+  image.
 - Variants render beside the default Dockerfile, for example `Dockerfile` and
   `slim.Dockerfile`.
 - Use `publish = true|false` to control whether an image target can enter the
