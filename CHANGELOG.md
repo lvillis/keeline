@@ -1,3 +1,11 @@
+## [0.1.7] - 2026-04-28
+
+### 🚀 Features
+
+- *(images)* Source runtime tools from OCI images
+- *(images)* Add unified runtime tools model
+- *(release)* Emit image metadata and attestations
+- *(release)* Add native per-arch image publishing
 ## [0.1.6] - 2026-04-27
 
 ### 🚀 Features
@@ -8,6 +16,7 @@
 
 - Update justfile
 - Update justfile
+- Release keeline version 0.1.6
 ## [0.1.5] - 2026-04-27
 
 ### ⚙️ Miscellaneous Tasks
