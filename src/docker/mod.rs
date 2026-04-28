@@ -20,6 +20,12 @@ pub struct DockerBuild {
     pub load: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct DockerManifest {
+    pub tags: Vec<String>,
+    pub sources: Vec<String>,
+}
+
 impl DockerBuild {
     pub fn display(&self) -> String {
         let mut parts = vec![
@@ -149,6 +155,53 @@ impl DockerBuild {
     }
 }
 
+impl DockerManifest {
+    pub fn display(&self) -> String {
+        let mut parts = vec![
+            "docker".to_string(),
+            "buildx".to_string(),
+            "imagetools".to_string(),
+            "create".to_string(),
+        ];
+
+        for tag in &self.tags {
+            parts.push("--tag".to_string());
+            parts.push(tag.clone());
+        }
+
+        parts.extend(self.sources.iter().cloned());
+        parts.join(" ")
+    }
+
+    pub fn run(&self) -> Result<()> {
+        if self.tags.is_empty() {
+            bail!("docker manifest request must include at least one tag");
+        }
+        if self.sources.is_empty() {
+            bail!("docker manifest request must include at least one source");
+        }
+
+        let mut command = Command::new("docker");
+        command.arg("buildx").arg("imagetools").arg("create");
+
+        for tag in &self.tags {
+            command.arg("--tag").arg(tag);
+        }
+
+        command.args(&self.sources);
+
+        let status = command
+            .status()
+            .context("failed to invoke docker buildx imagetools create")?;
+
+        if !status.success() {
+            bail!("docker buildx imagetools create exited with status {status}");
+        }
+
+        Ok(())
+    }
+}
+
 fn create_parent_dir(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
@@ -164,7 +217,7 @@ fn create_parent_dir(path: &Path) -> Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::DockerBuild;
+    use super::{DockerBuild, DockerManifest};
 
     #[test]
     fn display_includes_explicit_cache_options() {
@@ -201,5 +254,21 @@ mod tests {
         assert!(display.contains("--metadata-file target/keeline-release-metadata/sample.json"));
         assert!(display.contains("--sbom=true"));
         assert!(display.contains("--provenance=true"));
+    }
+
+    #[test]
+    fn manifest_display_includes_tags_and_sources() {
+        let request = DockerManifest {
+            tags: vec!["ghcr.io/example/keeline-debian:13".to_string()],
+            sources: vec![
+                "ghcr.io/example/keeline-debian:13-amd64".to_string(),
+                "ghcr.io/example/keeline-debian:13-arm64".to_string(),
+            ],
+        };
+
+        assert_eq!(
+            request.display(),
+            "docker buildx imagetools create --tag ghcr.io/example/keeline-debian:13 ghcr.io/example/keeline-debian:13-amd64 ghcr.io/example/keeline-debian:13-arm64"
+        );
     }
 }

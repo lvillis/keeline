@@ -2,59 +2,64 @@ use anyhow::Result;
 use serde::Serialize;
 
 use crate::cli::MatrixArgs;
-use crate::domain::ImageCatalog;
+use crate::commands::{platform_runner, platform_suffix};
+use crate::domain::{ImageCatalog, ImageTarget};
 
 #[derive(Debug, Serialize)]
-struct Matrix<'a> {
-    include: Vec<MatrixEntry<'a>>,
+struct Matrix {
+    include: Vec<MatrixEntry>,
 }
 
 #[derive(Debug, Serialize)]
-struct MatrixEntry<'a> {
-    id: &'a str,
-    family: &'a str,
-    line: &'a str,
-    version: &'a str,
-    distro: Option<&'a str>,
-    package: &'a str,
+struct MatrixEntry {
+    id: String,
+    family: String,
+    line: String,
+    version: String,
+    distro: Option<String>,
+    package: String,
     publish: bool,
-    status: &'a str,
+    status: &'static str,
     releasable: bool,
     context: String,
     dockerfile: String,
-    base_image: &'a str,
-    platforms: &'a [String],
-    canonical: &'a [String],
-    alias: &'a [String],
+    base_image: String,
+    platforms: Vec<String>,
+    canonical: Vec<String>,
+    alias: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    platform: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    arch: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runner: Option<&'static str>,
 }
 
 pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
     catalog.validate()?;
 
-    let matrix = Matrix {
-        include: catalog
-            .targets
-            .iter()
-            .filter(|target| args.all || target.is_releasable())
-            .map(|target| MatrixEntry {
-                id: &target.id,
-                family: &target.family,
-                line: &target.line,
-                version: &target.version,
-                distro: target.distro.as_deref(),
-                package: &target.package,
-                publish: target.publish,
-                status: target.status_label(),
-                releasable: target.is_releasable(),
-                context: target.context.display().to_string(),
-                dockerfile: target.dockerfile.display().to_string(),
-                base_image: &target.base_image,
-                platforms: &target.platforms,
-                canonical: &target.canonical_tags,
-                alias: &target.alias_tags,
-            })
-            .collect(),
+    let targets: Vec<&ImageTarget> = catalog
+        .targets
+        .iter()
+        .filter(|target| args.all || target.is_releasable())
+        .collect();
+
+    let include = if args.per_platform {
+        let mut entries = Vec::new();
+        for target in targets {
+            for platform in &target.platforms {
+                entries.push(entry(target, Some(platform))?);
+            }
+        }
+        entries
+    } else {
+        targets
+            .into_iter()
+            .map(|target| entry(target, None))
+            .collect::<Result<Vec<_>>>()?
     };
+
+    let matrix = Matrix { include };
 
     if args.pretty {
         println!("{}", serde_json::to_string_pretty(&matrix)?);
@@ -63,4 +68,36 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn entry(target: &ImageTarget, platform: Option<&String>) -> Result<MatrixEntry> {
+    let (platform, arch, runner) = match platform {
+        Some(platform) => (
+            Some(platform.clone()),
+            Some(platform_suffix(platform)?),
+            Some(platform_runner(platform)?),
+        ),
+        None => (None, None, None),
+    };
+
+    Ok(MatrixEntry {
+        id: target.id.clone(),
+        family: target.family.clone(),
+        line: target.line.clone(),
+        version: target.version.clone(),
+        distro: target.distro.clone(),
+        package: target.package.clone(),
+        publish: target.publish,
+        status: target.status_label(),
+        releasable: target.is_releasable(),
+        context: target.context.display().to_string(),
+        dockerfile: target.dockerfile.display().to_string(),
+        base_image: target.base_image.clone(),
+        platforms: target.platforms.clone(),
+        canonical: target.canonical_tags.clone(),
+        alias: target.alias_tags.clone(),
+        platform,
+        arch,
+        runner,
+    })
 }

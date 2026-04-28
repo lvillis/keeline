@@ -22,6 +22,7 @@ pub enum Command {
     Matrix(MatrixArgs),
     Render(RenderArgs),
     Build(BuildArgs),
+    Manifest(ManifestArgs),
     Release(ReleaseArgs),
     Verify(VerifyArgs),
 }
@@ -40,6 +41,8 @@ pub struct MatrixArgs {
     pub pretty: bool,
     #[arg(long)]
     pub all: bool,
+    #[arg(long)]
+    pub per_platform: bool,
 }
 
 #[derive(Debug, Args)]
@@ -68,6 +71,19 @@ pub struct ReleaseArgs {
     #[arg(long)]
     pub owner: String,
     #[arg(long)]
+    pub platform: Option<String>,
+    #[arg(long)]
+    pub tag_suffix: Option<String>,
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ManifestArgs {
+    pub image_id: Option<String>,
+    #[arg(long)]
+    pub owner: String,
+    #[arg(long)]
     pub dry_run: bool,
 }
 
@@ -83,6 +99,7 @@ impl Cli {
             Command::Matrix(args) => commands::matrix::run(&catalog, &args),
             Command::Render(args) => commands::render::run(&catalog, &args),
             Command::Build(args) => commands::build::run(&catalog, &args),
+            Command::Manifest(args) => commands::manifest::run(&catalog, &args),
             Command::Release(args) => commands::release::run(&catalog, &args),
             Command::Verify(args) => commands::verify::run(&catalog, &args),
         }

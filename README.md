@@ -16,7 +16,7 @@ flowchart LR
         B["list / matrix"]
         C["render"]
         D["verify"]
-        E["release"]
+        E["release / manifest"]
     end
 
     subgraph Generated["Generated outputs"]
