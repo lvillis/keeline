@@ -1,8 +1,20 @@
 # Keeline
 
-Keeline provides Debian-based runtime images and a minimal scratch tool image
-published to GHCR, with `tino` integrated as the default PID 1 init process
-plus `salus` and `motdyn` bundled as runtime utilities across the image line.
+[![CI](https://github.com/lvillis/keeline/actions/workflows/ci.yml/badge.svg)](https://github.com/lvillis/keeline/actions/workflows/ci.yml)
+[![Release Images](https://github.com/lvillis/keeline/actions/workflows/release.yml/badge.svg)](https://github.com/lvillis/keeline/actions/workflows/release.yml)
+[![crates.io](https://img.shields.io/crates/v/keeline?logo=rust)](https://crates.io/crates/keeline)
+[![docs.rs](https://img.shields.io/docsrs/keeline)](https://docs.rs/keeline)
+[![License](https://img.shields.io/crates/l/keeline)](LICENSE)
+[![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B-b7410e?logo=rust)](Cargo.toml)
+
+[![GHCR Debian](https://img.shields.io/badge/ghcr-keeline--debian-0969da?logo=github)](https://github.com/users/lvillis/packages/container/package/keeline-debian)
+[![GHCR Java](https://img.shields.io/badge/ghcr-keeline--java-0969da?logo=github)](https://github.com/users/lvillis/packages/container/package/keeline-java)
+[![GHCR Scratch](https://img.shields.io/badge/ghcr-keeline--scratch-0969da?logo=github)](https://github.com/users/lvillis/packages/container/package/keeline-scratch)
+
+Keeline provides small, predictable runtime container images published to GHCR.
+The image line includes Debian, Debian-based Java runtimes, and a minimal
+scratch tool image. Every image bundles `tino` as PID 1 plus `salus` and
+`motdyn` as runtime utilities.
 
 ## Flow
 
