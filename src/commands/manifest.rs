@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, ensure};
 
 use crate::cli::ManifestArgs;
-use crate::commands::{platform_suffix, tag_with_suffix};
+use crate::commands::{oci_image_licenses, oci_image_source, platform_suffix, tag_with_suffix};
 use crate::docker::DockerManifest;
 use crate::domain::{ImageCatalog, ImageTarget};
 
@@ -30,6 +30,9 @@ pub fn run(catalog: &ImageCatalog, args: &ManifestArgs) -> Result<()> {
         "no releasable image targets were selected"
     );
 
+    let image_source = oci_image_source();
+    let image_licenses = oci_image_licenses();
+
     for target in targets {
         let repository = target.repository(&args.owner);
         let platform_suffixes = target
@@ -44,6 +47,7 @@ pub fn run(catalog: &ImageCatalog, args: &ManifestArgs) -> Result<()> {
                 .map(|suffix| format!("{repository}:{}", tag_with_suffix(&tag, suffix)))
                 .collect();
             let request = DockerManifest {
+                annotations: oci_index_annotations(target, &image_source, &image_licenses),
                 tags: vec![format!("{repository}:{tag}")],
                 sources,
             };
@@ -58,4 +62,25 @@ pub fn run(catalog: &ImageCatalog, args: &ManifestArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn oci_index_annotations(
+    target: &ImageTarget,
+    image_source: &str,
+    image_licenses: &str,
+) -> Vec<(String, String)> {
+    vec![
+        (
+            "index:org.opencontainers.image.description".to_string(),
+            target.description.clone(),
+        ),
+        (
+            "index:org.opencontainers.image.source".to_string(),
+            image_source.to_string(),
+        ),
+        (
+            "index:org.opencontainers.image.licenses".to_string(),
+            image_licenses.to_string(),
+        ),
+    ]
 }

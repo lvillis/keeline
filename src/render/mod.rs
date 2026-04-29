@@ -525,10 +525,10 @@ mod tests {
     }
 
     #[test]
-    fn places_label_args_after_runtime_verification_in_jdk_images() {
+    fn places_label_args_after_runtime_verification_in_java_images() {
         let target = ImageTarget {
             schema: 1,
-            id: "java-jdk-21-trixie".to_string(),
+            id: "java-21-trixie".to_string(),
             family: "java".to_string(),
             line: "21".to_string(),
             version: "21.0.10".to_string(),
@@ -542,10 +542,10 @@ mod tests {
             platforms: vec!["linux/amd64".to_string()],
             base_image: "docker.io/library/debian:13".to_string(),
             builder_image: None,
-            title: "Keeline JDK 21 Trixie".to_string(),
-            description: "Keeline JDK 21.0.10 on Debian 13 (trixie)".to_string(),
+            title: "Keeline Java 21 Trixie".to_string(),
+            description: "Keeline Java 21.0.10 on Debian 13 (trixie)".to_string(),
             command: vec!["jshell".to_string()],
-            canonical_tags: vec!["jdk-21-trixie".to_string()],
+            canonical_tags: vec!["21-trixie".to_string()],
             alias_tags: vec![],
             tools: vec![
                 ToolRuntime {

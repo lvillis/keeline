@@ -12,14 +12,13 @@ pub mod verify;
 
 pub(crate) const RELEASE_METADATA_DIR: &str = "target/keeline-release-metadata";
 
+pub(crate) const IMAGE_LICENSES: &str = "Apache-2.0";
+
 pub(crate) fn build_args() -> Vec<(String, String)> {
     vec![
         ("KEELINE_IMAGE_SOURCE".to_string(), image_source()),
         ("KEELINE_IMAGE_REVISION".to_string(), image_revision()),
-        (
-            "KEELINE_IMAGE_LICENSES".to_string(),
-            "Apache-2.0".to_string(),
-        ),
+        ("KEELINE_IMAGE_LICENSES".to_string(), image_licenses()),
     ]
 }
 
@@ -53,6 +52,14 @@ pub(crate) fn tag_with_suffix(tag: &str, suffix: &str) -> String {
     format!("{tag}-{suffix}")
 }
 
+pub(crate) fn oci_image_source() -> String {
+    image_source()
+}
+
+pub(crate) fn oci_image_licenses() -> String {
+    image_licenses()
+}
+
 fn image_source() -> String {
     std::env::var("KEELINE_IMAGE_SOURCE")
         .ok()
@@ -71,6 +78,10 @@ fn image_revision() -> String {
         .or_else(|| std::env::var("GITHUB_SHA").ok())
         .or_else(|| git_output(&["rev-parse", "HEAD"]))
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn image_licenses() -> String {
+    std::env::var("KEELINE_IMAGE_LICENSES").unwrap_or_else(|_| IMAGE_LICENSES.to_string())
 }
 
 fn git_output(args: &[&str]) -> Option<String> {

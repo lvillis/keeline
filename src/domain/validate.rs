@@ -9,6 +9,7 @@ const BANNED_TAGS: &[&str] = &[
     "latest",
     "stable",
     "v21",
+    "java-21",
     "jdk-21",
     "bookworm-21",
     "trixie-21",
@@ -33,9 +34,8 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
-    let java_canonical = Regex::new(
-        r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
-    )?;
+    let java_canonical =
+        Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$")?;
     let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$")?;
     let sha256_pattern = Regex::new(r"^[a-f0-9]{64}$")?;
 
@@ -646,10 +646,8 @@ mod tests {
     fn accepts_debian_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let java_canonical = Regex::new(
-            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
-        )
-        .unwrap();
+        let java_canonical =
+            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
@@ -669,10 +667,8 @@ mod tests {
     fn rejects_banned_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let java_canonical = Regex::new(
-            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
-        )
-        .unwrap();
+        let java_canonical =
+            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
@@ -691,17 +687,15 @@ mod tests {
     }
 
     #[test]
-    fn accepts_jdk_update_tags() {
+    fn accepts_java_update_tags() {
         let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
         let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
-        let java_canonical = Regex::new(
-            r"^(?:jdk|jre|runtime)-[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$",
-        )
-        .unwrap();
+        let java_canonical =
+            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
         let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
         let mut published = std::collections::HashSet::new();
 
-        let target = make_target("keeline-java", &["jdk-8u372-trixie"], &[]);
+        let target = make_target("keeline-java", &["8u372-trixie"], &[]);
         validate_tags(
             &target,
             &debian_canonical,
@@ -711,6 +705,29 @@ mod tests {
             &mut published,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn rejects_legacy_jdk_prefixed_java_tags() {
+        let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$").unwrap();
+        let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$").unwrap();
+        let java_canonical =
+            Regex::new(r"^[0-9]+(?:(?:\.[0-9]+)*|u[0-9]+)?-[a-z0-9]+(?:-[a-z0-9]+)?$").unwrap();
+        let generic_tag = Regex::new(r"^[a-z0-9][a-z0-9.-]*$").unwrap();
+        let mut published = std::collections::HashSet::new();
+
+        let target = make_target("keeline-java", &["jdk-21-trixie"], &[]);
+        assert!(
+            validate_tags(
+                &target,
+                &debian_canonical,
+                &debian_alias,
+                &java_canonical,
+                &generic_tag,
+                &mut published,
+            )
+            .is_err()
+        );
     }
 
     #[test]

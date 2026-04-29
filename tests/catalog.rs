@@ -66,7 +66,7 @@ fn all_repository_images_declare_runtime_tools() {
 fn rendered_images_include_bundled_tools() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
     let debian = catalog.target("debian-13").unwrap();
-    let java = catalog.target("java-jdk-21-trixie").unwrap();
+    let java = catalog.target("java-21-trixie").unwrap();
     let scratch = catalog.target("scratch-1").unwrap();
 
     let debian_rendered = render::render(debian).unwrap();
@@ -102,9 +102,9 @@ fn rendered_images_include_bundled_tools() {
 }
 
 #[test]
-fn jdk_slim_targets_override_runtime_packages_and_locale_defaults() {
+fn java_slim_targets_override_runtime_packages_and_locale_defaults() {
     let catalog = ImageCatalog::discover(Path::new("images")).unwrap();
-    let target = catalog.target("java-jdk-21-trixie-slim").unwrap();
+    let target = catalog.target("java-21-trixie-slim").unwrap();
     let java = target.java.as_ref().unwrap();
 
     assert_eq!(

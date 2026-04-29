@@ -376,7 +376,7 @@ mod tests {
             title: "Sample".to_string(),
             description: "Sample image".to_string(),
             command: vec!["jshell".to_string()],
-            canonical_tags: vec!["jdk-21-trixie".to_string()],
+            canonical_tags: vec!["21-trixie".to_string()],
             alias_tags: Vec::new(),
             tools: Vec::new(),
             source: None,

@@ -22,6 +22,7 @@ pub struct DockerBuild {
 
 #[derive(Debug, Clone)]
 pub struct DockerManifest {
+    pub annotations: Vec<(String, String)>,
     pub tags: Vec<String>,
     pub sources: Vec<String>,
 }
@@ -85,7 +86,7 @@ impl DockerBuild {
 
         parts.push(self.context.display().to_string());
 
-        parts.join(" ")
+        display_command(&parts)
     }
 
     pub fn run(&self) -> Result<()> {
@@ -169,8 +170,13 @@ impl DockerManifest {
             parts.push(tag.clone());
         }
 
+        for (name, value) in &self.annotations {
+            parts.push("--annotation".to_string());
+            parts.push(format!("{name}={value}"));
+        }
+
         parts.extend(self.sources.iter().cloned());
-        parts.join(" ")
+        display_command(&parts)
     }
 
     pub fn run(&self) -> Result<()> {
@@ -186,6 +192,10 @@ impl DockerManifest {
 
         for tag in &self.tags {
             command.arg("--tag").arg(tag);
+        }
+
+        for (name, value) in &self.annotations {
+            command.arg("--annotation").arg(format!("{name}={value}"));
         }
 
         command.args(&self.sources);
@@ -213,6 +223,25 @@ fn create_parent_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn display_command(parts: &[String]) -> String {
+    parts
+        .iter()
+        .map(|part| shell_quote(part))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn shell_quote(value: &str) -> String {
+    if value
+        .bytes()
+        .all(|byte| matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' | b'.' | b'/' | b':' | b'=' | b',' | b'@'))
+    {
+        return value.to_string();
+    }
+
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -235,7 +264,7 @@ mod tests {
                 "type=registry,ref=ghcr.io/example/keeline-java:buildcache,mode=max".to_string(),
             ],
             metadata_file: Some(PathBuf::from("target/keeline-release-metadata/sample.json")),
-            tags: vec!["ghcr.io/example/keeline-java:jdk-21-trixie".to_string()],
+            tags: vec!["ghcr.io/example/keeline-java:21-trixie".to_string()],
             platforms: vec!["linux/amd64".to_string(), "linux/arm64".to_string()],
             sbom: true,
             provenance: true,
@@ -259,6 +288,20 @@ mod tests {
     #[test]
     fn manifest_display_includes_tags_and_sources() {
         let request = DockerManifest {
+            annotations: vec![
+                (
+                    "index:org.opencontainers.image.description".to_string(),
+                    "Keeline Debian 13".to_string(),
+                ),
+                (
+                    "index:org.opencontainers.image.source".to_string(),
+                    "https://github.com/example/keeline".to_string(),
+                ),
+                (
+                    "index:org.opencontainers.image.licenses".to_string(),
+                    "Apache-2.0".to_string(),
+                ),
+            ],
             tags: vec!["ghcr.io/example/keeline-debian:13".to_string()],
             sources: vec![
                 "ghcr.io/example/keeline-debian:13-amd64".to_string(),
@@ -268,7 +311,7 @@ mod tests {
 
         assert_eq!(
             request.display(),
-            "docker buildx imagetools create --tag ghcr.io/example/keeline-debian:13 ghcr.io/example/keeline-debian:13-amd64 ghcr.io/example/keeline-debian:13-arm64"
+            "docker buildx imagetools create --tag ghcr.io/example/keeline-debian:13 --annotation 'index:org.opencontainers.image.description=Keeline Debian 13' --annotation index:org.opencontainers.image.source=https://github.com/example/keeline --annotation index:org.opencontainers.image.licenses=Apache-2.0 ghcr.io/example/keeline-debian:13-amd64 ghcr.io/example/keeline-debian:13-arm64"
         );
     }
 }

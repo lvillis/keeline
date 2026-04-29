@@ -104,13 +104,13 @@ mod tests {
     fn computes_widths_from_headers_and_rows() {
         let headers = ["ID", "STATUS", "GHCR", "CONTEXT"];
         let rows = vec![[
-            "java-jdk-8u372-trixie".to_string(),
+            "java-8u372-trixie".to_string(),
             "stable".to_string(),
-            "ghcr.io/example/keeline-java:jdk-8u372-trixie".to_string(),
+            "ghcr.io/example/keeline-java:8u372-trixie".to_string(),
             "images/java/8/trixie".to_string(),
         ]];
 
-        assert_eq!(column_widths(&headers, &rows), [21, 6, 45, 20]);
+        assert_eq!(column_widths(&headers, &rows), [17, 6, 41, 20]);
     }
 
     #[test]

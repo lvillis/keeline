@@ -86,8 +86,8 @@ RUN set -eux; \
 ARG KEELINE_IMAGE_SOURCE=https://github.com/unknown/unknown
 ARG KEELINE_IMAGE_REVISION=unknown
 ARG KEELINE_IMAGE_LICENSES=Apache-2.0
-LABEL org.opencontainers.image.title="Keeline JDK 17 Trixie" \
-      org.opencontainers.image.description="Keeline JDK 17.0.18 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs" \
+LABEL org.opencontainers.image.title="Keeline Java 17 Trixie" \
+      org.opencontainers.image.description="Keeline Java 17.0.18 on Debian 13 (trixie), sourced from Adoptium Temurin release tarballs" \
       org.opencontainers.image.source="${KEELINE_IMAGE_SOURCE}" \
       org.opencontainers.image.revision="${KEELINE_IMAGE_REVISION}" \
       org.opencontainers.image.licenses="${KEELINE_IMAGE_LICENSES}" \
