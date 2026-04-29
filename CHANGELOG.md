@@ -1,3 +1,8 @@
+## [0.1.8] - 2026-04-29
+
+### 🚀 Features
+
+- *(images)* [**breaking**] Simplify Java tags and annotate manifests
 ## [0.1.7] - 2026-04-28
 
 ### 🚀 Features
@@ -6,6 +11,10 @@
 - *(images)* Add unified runtime tools model
 - *(release)* Emit image metadata and attestations
 - *(release)* Add native per-arch image publishing
+
+### ⚙️ Miscellaneous Tasks
+
+- Release keeline version 0.1.7
 ## [0.1.6] - 2026-04-27
 
 ### 🚀 Features
