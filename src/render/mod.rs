@@ -586,9 +586,9 @@ mod tests {
                 ToolRuntime {
                     name: "motdyn".to_string(),
                     role: ToolRole::Motd,
-                    release: "1.0.13".to_string(),
+                    release: "1.0.14".to_string(),
                     image: Some(
-                        "ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b"
+                        "ghcr.io/lvillis/motdyn:1.0.14-slim@sha256:68eb88ae6031b08afaade56e04a0497f6139f80445bb6b3d27dc03a294ed1ef6"
                             .to_string(),
                     ),
                     source_path: "/usr/local/bin/motdyn".to_string(),

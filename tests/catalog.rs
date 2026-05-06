@@ -75,7 +75,7 @@ fn rendered_images_include_bundled_tools() {
 
     assert!(debian_rendered.contains("FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS tino"));
     assert!(debian_rendered.contains("FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS salus"));
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b AS motdyn"));
+    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/motdyn:1.0.14-slim@sha256:68eb88ae6031b08afaade56e04a0497f6139f80445bb6b3d27dc03a294ed1ef6 AS motdyn"));
     assert!(debian_rendered.contains("COPY --from=tino /sbin/tino /sbin/tino"));
     assert!(debian_rendered.contains("COPY --from=salus /bin/salus /bin/salus"));
     assert!(
@@ -155,8 +155,8 @@ target_path = "/bin/salus"
 
 [tools.motdyn]
 role = "motd"
-release = "1.0.13"
-image = "ghcr.io/lvillis/motdyn:1.0.13-slim@sha256:69959f263d1a7426526b7214bff625d1d1466b43eb0ac74c41ecf4d38a4add9b"
+release = "1.0.14"
+image = "ghcr.io/lvillis/motdyn:1.0.14-slim@sha256:68eb88ae6031b08afaade56e04a0497f6139f80445bb6b3d27dc03a294ed1ef6"
 source_path = "/usr/local/bin/motdyn"
 target_path = "/usr/local/bin/motdyn"
 
