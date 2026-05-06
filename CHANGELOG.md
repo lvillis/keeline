@@ -1,8 +1,18 @@
+## [0.1.9] - 2026-05-06
+
+### ⚙️ Miscellaneous Tasks
+
+- *(docs)* Update README.md
+- *(images)* Upgrade motdyn to 1.0.14
 ## [0.1.8] - 2026-04-29
 
 ### 🚀 Features
 
 - *(images)* [**breaking**] Simplify Java tags and annotate manifests
+
+### ⚙️ Miscellaneous Tasks
+
+- Release keeline version 0.1.8
 ## [0.1.7] - 2026-04-28
 
 ### 🚀 Features
