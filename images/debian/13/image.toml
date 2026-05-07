@@ -11,8 +11,8 @@ platforms = ["linux/amd64", "linux/arm64"]
 
 [tools.tino]
 role = "init"
-release = "0.1.26"
-image = "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
+release = "0.1.27"
+image = "ghcr.io/lvillis/tino:0.1.27@sha256:43e4234cec7c7b19139036ee5ac3ad209838312048214cab3ed3d8acb0eea4b4"
 source_path = "/sbin/tino"
 target_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
