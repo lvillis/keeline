@@ -1,3 +1,17 @@
+## [0.1.11] - 2026-05-07
+
+### 🚀 Features
+
+- *(cli)* Add tool update commands
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump tino to 0.1.27
+## [0.1.10] - 2026-05-06
+
+### ⚙️ Miscellaneous Tasks
+
+- Release keeline version 0.1.10
 ## [0.1.9] - 2026-05-06
 
 ### ⚙️ Miscellaneous Tasks
