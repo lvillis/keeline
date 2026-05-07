@@ -8,6 +8,7 @@ pub mod manifest;
 pub mod matrix;
 pub mod release;
 pub mod render;
+pub mod tool;
 pub mod verify;
 
 pub(crate) const RELEASE_METADATA_DIR: &str = "target/keeline-release-metadata";

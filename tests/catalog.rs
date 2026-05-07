@@ -73,9 +73,11 @@ fn rendered_images_include_bundled_tools() {
     let java_rendered = render::render(java).unwrap();
     let scratch_rendered = render::render(scratch).unwrap();
 
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b AS tino"));
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568 AS salus"));
-    assert!(debian_rendered.contains("FROM ghcr.io/lvillis/motdyn:1.0.14-slim@sha256:68eb88ae6031b08afaade56e04a0497f6139f80445bb6b3d27dc03a294ed1ef6 AS motdyn"));
+    for tool_name in ["tino", "salus", "motdyn"] {
+        let tool = debian.tool(tool_name).unwrap();
+        let image = tool.image.as_deref().unwrap();
+        assert!(debian_rendered.contains(&format!("FROM {image} AS {tool_name}")));
+    }
     assert!(debian_rendered.contains("COPY --from=tino /sbin/tino /sbin/tino"));
     assert!(debian_rendered.contains("COPY --from=salus /bin/salus /bin/salus"));
     assert!(
