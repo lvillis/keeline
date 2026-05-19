@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use walkdir::WalkDir;
 
 use crate::domain::model::{
@@ -13,11 +13,12 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
     let root = root.to_path_buf();
     let mut targets = Vec::new();
 
-    for entry in WalkDir::new(&root)
-        .into_iter()
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().is_file() && entry.file_name() == "image.toml")
-    {
+    for entry in WalkDir::new(&root).into_iter() {
+        let entry = entry.with_context(|| format!("failed to walk {}", root.display()))?;
+        if !entry.file_type().is_file() || entry.file_name() != "image.toml" {
+            continue;
+        }
+
         let definition_file = entry.path().to_path_buf();
         let context_dir = definition_file
             .parent()
@@ -26,6 +27,11 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
             .with_context(|| format!("failed to read {}", definition_file.display()))?;
         let definition: RawImageDefinition = toml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", definition_file.display()))?;
+        ensure!(
+            !definition.variants.is_empty(),
+            "{} must declare at least one [[variants]] entry",
+            definition_file.display()
+        );
 
         let source = definition.source.as_ref().map(|source| ImageSource {
             provider: source.provider.clone(),

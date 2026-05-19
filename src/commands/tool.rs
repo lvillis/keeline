@@ -1,15 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::ops::Range;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail, ensure};
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use toml_edit::{DocumentMut, value};
 
 use crate::cli::{ToolArgs, ToolCommand, ToolListArgs, ToolOutdatedArgs, ToolUpdateArgs};
 use crate::domain::{ImageCatalog, ToolRole};
+use crate::output::Table;
 use crate::render;
 
 const OCI_ACCEPT: &str = concat!(
@@ -37,31 +38,31 @@ fn list(catalog: &ImageCatalog, args: &ToolListArgs) -> Result<()> {
         return Ok(());
     }
 
-    let rows = declarations
-        .iter()
-        .map(|tool| {
-            vec![
-                tool.name.clone(),
-                tool.role.as_str().to_string(),
-                tool.release.clone(),
-                tool.image_tag_reference()
-                    .unwrap_or_else(|| "-".to_string()),
-                tool.image_ref
-                    .as_ref()
-                    .map(|image| short_digest(&image.digest))
-                    .unwrap_or_else(|| "-".to_string()),
-                tool.definition_files.len().to_string(),
-                tool.target_ids.len().to_string(),
-            ]
-        })
-        .collect::<Vec<_>>();
+    let mut table = Table::new([
+        "TOOL", "ROLE", "RELEASE", "IMAGE", "DIGEST", "DEFS", "TARGETS",
+    ]);
 
-    print_table(
-        &[
-            "TOOL", "ROLE", "RELEASE", "IMAGE", "DIGEST", "DEFS", "TARGETS",
-        ],
-        &rows,
-    );
+    for tool in declarations {
+        let image = tool
+            .image_tag_reference()
+            .unwrap_or_else(|| "-".to_string());
+        let digest = tool
+            .image_ref
+            .as_ref()
+            .map(|image| short_digest(&image.digest))
+            .unwrap_or_else(|| "-".to_string());
+        table.push_row([
+            tool.name,
+            tool.role.as_str().to_string(),
+            tool.release,
+            image,
+            digest,
+            tool.definition_files.len().to_string(),
+            tool.target_ids.len().to_string(),
+        ]);
+    }
+
+    table.print();
 
     Ok(())
 }
@@ -77,7 +78,7 @@ fn outdated(catalog: &ImageCatalog, args: &ToolOutdatedArgs) -> Result<()> {
         print_checks(&checks);
     }
 
-    if args.check && checks.iter().any(ToolCheck::has_newer_version) {
+    if args.check && checks.iter().any(ToolCheck::needs_attention) {
         bail!("tool updates are available");
     }
 
@@ -100,7 +101,7 @@ fn update(catalog: &ImageCatalog, args: &ToolUpdateArgs) -> Result<()> {
 
     if updates.is_empty() {
         print_checks(&checks);
-        if checks.iter().any(ToolCheck::has_newer_version) {
+        if checks.iter().any(ToolCheck::needs_attention) {
             println!("no tool updates applied; use --allow-major to include major updates");
         } else {
             println!("all tools are current");
@@ -194,7 +195,7 @@ struct ToolCheck {
 }
 
 impl ToolCheck {
-    fn has_newer_version(&self) -> bool {
+    fn needs_attention(&self) -> bool {
         self.status != ToolStatus::Current
     }
 }
@@ -203,6 +204,7 @@ impl ToolCheck {
 #[serde(rename_all = "kebab-case")]
 enum ToolStatus {
     Current,
+    DigestChanged,
     UpdateAvailable,
     MajorSkipped,
 }
@@ -211,6 +213,7 @@ impl ToolStatus {
     fn as_str(self) -> &'static str {
         match self {
             Self::Current => "current",
+            Self::DigestChanged => "digest-changed",
             Self::UpdateAvailable => "update-available",
             Self::MajorSkipped => "major-skipped",
         }
@@ -364,51 +367,83 @@ fn check_declaration(
     );
 
     let tags = client.tags(&image.repository)?;
-    let versions = matching_versions(&tags, suffix);
+    let mut versions = matching_versions(&tags, suffix);
     ensure!(
         !versions.is_empty(),
         "tool `{}` has no semver tags matching suffix `{suffix}`",
         declaration.name
     );
+    versions.sort_by(|left, right| left.version.cmp(&right.version));
 
-    let newest = versions
-        .iter()
-        .max_by(|left, right| left.version.cmp(&right.version))
-        .expect("versions is not empty");
+    let newest = versions.last().expect("versions is not empty");
     let allowed = versions
         .iter()
-        .filter(|candidate| allow_major || candidate.version.major == current.major)
-        .max_by(|left, right| left.version.cmp(&right.version));
-    let selected = match allowed {
+        .rfind(|candidate| allow_major || candidate.version.major == current.major);
+    let selected_update = match allowed {
         Some(candidate) if candidate.version > current => Some(candidate),
         _ => None,
     };
 
-    let (status, latest) = if newest.version <= current {
-        (ToolStatus::Current, newest)
-    } else if let Some(candidate) = selected {
-        (ToolStatus::UpdateAvailable, candidate)
+    let newest_digest = if newest.version == current {
+        current_manifest_digest(client, image)?
     } else {
-        (ToolStatus::MajorSkipped, newest)
+        client.manifest_digest(&image.repository, &newest.tag)?
     };
 
-    let latest_digest = if latest.version == current {
-        image.digest.clone()
+    let (status, update_release, update_image, latest_image, latest_digest) =
+        if let Some(candidate) = selected_update {
+            let digest = if candidate.version == newest.version {
+                newest_digest.clone()
+            } else {
+                client.manifest_digest(&image.repository, &candidate.tag)?
+            };
+            let candidate_image = image.with_tag_and_digest(&candidate.tag, &digest);
+
+            (
+                ToolStatus::UpdateAvailable,
+                Some(candidate.version.to_string()),
+                Some(candidate_image.clone()),
+                candidate_image,
+                digest,
+            )
+        } else if newest.version > current {
+            (
+                ToolStatus::MajorSkipped,
+                None,
+                None,
+                image.with_tag_and_digest(&newest.tag, &newest_digest),
+                newest_digest,
+            )
+        } else if newest_digest != image.digest {
+            let refreshed_image = image.with_tag_and_digest(&image.tag, &newest_digest);
+            (
+                ToolStatus::DigestChanged,
+                Some(declaration.release.clone()),
+                Some(refreshed_image.clone()),
+                refreshed_image,
+                newest_digest,
+            )
+        } else {
+            (
+                ToolStatus::Current,
+                None,
+                None,
+                image.with_tag_and_digest(&image.tag, &image.digest),
+                image.digest.clone(),
+            )
+        };
+
+    let latest_release = if status == ToolStatus::UpdateAvailable {
+        update_release.clone().expect("update release is set")
     } else {
-        client.manifest_digest(&image.repository, &latest.tag)?
-    };
-    let latest_image = image.with_tag_and_digest(&latest.tag, &latest_digest);
-    let (update_release, update_image) = if status == ToolStatus::UpdateAvailable {
-        (Some(latest.version.to_string()), Some(latest_image.clone()))
-    } else {
-        (None, None)
+        newest.version.to_string()
     };
 
     Ok(ToolCheck {
         name: declaration.name.clone(),
         status,
         current_release: declaration.release.clone(),
-        latest_release: latest.version.to_string(),
+        latest_release,
         current_image: declaration
             .image
             .clone()
@@ -450,6 +485,10 @@ fn matching_versions(tags: &[String], suffix: &str) -> Vec<CandidateVersion> {
     versions
 }
 
+fn current_manifest_digest(client: &RegistryClient, image: &ImageReference) -> Result<String> {
+    client.manifest_digest(&image.repository, &image.tag)
+}
+
 fn apply_updates(updates: &[PlannedToolUpdate]) -> Result<()> {
     let mut files = BTreeSet::new();
     for update in updates {
@@ -475,55 +514,39 @@ fn apply_updates(updates: &[PlannedToolUpdate]) -> Result<()> {
 }
 
 fn update_tool_block(contents: &str, update: &PlannedToolUpdate) -> Result<String> {
-    let range = tool_block_range(contents, &update.name)
+    let mut document = contents
+        .parse::<DocumentMut>()
+        .context("failed to parse image definition as editable TOML")?;
+    let tool = document
+        .get_mut("tools")
+        .and_then(|tools| tools.get_mut(&update.name))
         .with_context(|| format!("tool block `[tools.{}]` was not found", update.name))?;
-    let block = &contents[range.clone()];
-    let old_release = format!("release = \"{}\"", update.old_release);
-    let new_release = format!("release = \"{}\"", update.new_release);
-    let old_image = format!("image = \"{}\"", update.old_image);
-    let new_image = format!("image = \"{}\"", update.new_image);
+    let release = tool
+        .get("release")
+        .and_then(|item| item.as_str())
+        .with_context(|| format!("tool `{}` block is missing string `release`", update.name))?;
+    let image = tool
+        .get("image")
+        .and_then(|item| item.as_str())
+        .with_context(|| format!("tool `{}` block is missing string `image`", update.name))?;
 
     ensure!(
-        block.contains(&old_release),
+        release == update.old_release,
         "tool `{}` block does not contain expected release `{}`",
         update.name,
         update.old_release
     );
     ensure!(
-        block.contains(&old_image),
+        image == update.old_image,
         "tool `{}` block does not contain expected image `{}`",
         update.name,
         update.old_image
     );
 
-    let updated_block = block
-        .replace(&old_release, &new_release)
-        .replace(&old_image, &new_image);
-    let mut updated = String::with_capacity(contents.len() + updated_block.len() - block.len());
-    updated.push_str(&contents[..range.start]);
-    updated.push_str(&updated_block);
-    updated.push_str(&contents[range.end..]);
+    tool["release"] = value(&update.new_release);
+    tool["image"] = value(&update.new_image);
 
-    Ok(updated)
-}
-
-fn tool_block_range(contents: &str, tool_name: &str) -> Option<Range<usize>> {
-    let header = format!("[tools.{tool_name}]");
-    let mut start = None;
-    let mut offset = 0;
-
-    for line in contents.split_inclusive('\n') {
-        let trimmed = line.trim();
-        if start.is_none() && trimmed == header {
-            start = Some(offset);
-        } else if start.is_some() && trimmed.starts_with('[') {
-            return Some(start.expect("start is set")..offset);
-        }
-
-        offset += line.len();
-    }
-
-    start.map(|start| start..contents.len())
+    Ok(document.to_string())
 }
 
 fn parse_pinned_image_reference(reference: &str) -> Result<ImageReference> {
@@ -577,26 +600,44 @@ impl RegistryClient {
 
     fn tags(&self, repository: &str) -> Result<Vec<String>> {
         let token = self.token(repository)?;
-        let url = format!("https://ghcr.io/v2/{repository}/tags/list?n=1000");
-        let mut response = self
-            .agent
-            .get(&url)
-            .header("Authorization", format!("Bearer {token}"))
-            .header("User-Agent", user_agent())
-            .call()
-            .with_context(|| format!("failed to fetch tags for ghcr.io/{repository}"))?;
+        let mut url = format!("https://ghcr.io/v2/{repository}/tags/list?n=100");
+        let mut tags = Vec::new();
 
-        ensure!(
-            response.status().is_success(),
-            "failed to fetch tags for ghcr.io/{repository}: HTTP {}",
-            response.status().as_u16()
-        );
+        loop {
+            let mut response = self
+                .agent
+                .get(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .header("User-Agent", user_agent())
+                .call()
+                .with_context(|| format!("failed to fetch tags for ghcr.io/{repository}"))?;
 
-        let body = response.body_mut().read_to_string()?;
-        let tags: TagsResponse = serde_json::from_str(&body)
-            .with_context(|| format!("failed to parse tag list for ghcr.io/{repository}"))?;
+            ensure!(
+                response.status().is_success(),
+                "failed to fetch tags for ghcr.io/{repository}: HTTP {}",
+                response.status().as_u16()
+            );
 
-        Ok(tags.tags.unwrap_or_default())
+            let next = response
+                .headers()
+                .get("link")
+                .and_then(|value| value.to_str().ok())
+                .and_then(next_link);
+            let body = response.body_mut().read_to_string()?;
+            let page: TagsResponse = serde_json::from_str(&body)
+                .with_context(|| format!("failed to parse tag list for ghcr.io/{repository}"))?;
+            tags.extend(page.tags.unwrap_or_default());
+
+            let Some(next) = next else {
+                break;
+            };
+            url = registry_url(&next);
+        }
+
+        tags.sort();
+        tags.dedup();
+
+        Ok(tags)
     }
 
     fn manifest_digest(&self, repository: &str, tag: &str) -> Result<String> {
@@ -674,71 +715,57 @@ fn user_agent() -> String {
     format!("keeline/{}", env!("CARGO_PKG_VERSION"))
 }
 
-fn print_checks(checks: &[ToolCheck]) {
-    let rows = checks
-        .iter()
-        .map(|check| {
-            vec![
-                check.name.clone(),
-                check.current_release.clone(),
-                check.latest_release.clone(),
-                check.status.as_str().to_string(),
-                short_digest(&check.current_digest),
-                short_digest(&check.latest_digest),
-            ]
-        })
-        .collect::<Vec<_>>();
+fn next_link(header: &str) -> Option<String> {
+    header.split(',').find_map(|link| {
+        let link = link.trim();
+        let (reference, params) = link.split_once(';')?;
+        if !params
+            .split(';')
+            .any(|param| param.trim() == r#"rel="next""#)
+        {
+            return None;
+        }
 
-    print_table(
-        &[
-            "TOOL",
-            "CURRENT",
-            "LATEST",
-            "STATUS",
-            "CURRENT DIGEST",
-            "LATEST DIGEST",
-        ],
-        &rows,
-    );
+        Some(
+            reference
+                .trim()
+                .strip_prefix('<')?
+                .strip_suffix('>')?
+                .to_string(),
+        )
+    })
 }
 
-fn print_table(headers: &[&str], rows: &[Vec<String>]) {
-    let mut widths = headers
-        .iter()
-        .map(|header| header.len())
-        .collect::<Vec<_>>();
+fn registry_url(link: &str) -> String {
+    if link.starts_with("https://") {
+        link.to_string()
+    } else {
+        format!("https://ghcr.io{link}")
+    }
+}
 
-    for row in rows {
-        for (index, value) in row.iter().enumerate() {
-            widths[index] = widths[index].max(value.len());
-        }
+fn print_checks(checks: &[ToolCheck]) {
+    let mut table = Table::new([
+        "TOOL",
+        "CURRENT",
+        "LATEST",
+        "STATUS",
+        "CURRENT DIGEST",
+        "LATEST DIGEST",
+    ]);
+
+    for check in checks {
+        table.push_row([
+            check.name.clone(),
+            check.current_release.clone(),
+            check.latest_release.clone(),
+            check.status.as_str().to_string(),
+            short_digest(&check.current_digest),
+            short_digest(&check.latest_digest),
+        ]);
     }
 
-    for (index, header) in headers.iter().enumerate() {
-        if index > 0 {
-            print!("  ");
-        }
-        print!("{header:<width$}", width = widths[index]);
-    }
-    println!();
-
-    for (index, width) in widths.iter().enumerate() {
-        if index > 0 {
-            print!("  ");
-        }
-        print!("{:-<width$}", "", width = width);
-    }
-    println!();
-
-    for row in rows {
-        for (index, value) in row.iter().enumerate() {
-            if index > 0 {
-                print!("  ");
-            }
-            print!("{value:<width$}", width = widths[index]);
-        }
-        println!();
-    }
+    table.print();
 }
 
 fn short_digest(digest: &str) -> String {
@@ -794,8 +821,8 @@ fn percent_encode(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        PlannedToolUpdate, derive_tag_suffix, matching_versions, parse_pinned_image_reference,
-        percent_encode, update_tool_block,
+        PlannedToolUpdate, derive_tag_suffix, matching_versions, next_link,
+        parse_pinned_image_reference, percent_encode, registry_url, update_tool_block,
     };
 
     #[test]
@@ -862,6 +889,20 @@ image = "ghcr.io/lvillis/salus:0.1.8@sha256:keep"
         assert!(updated.contains("release = \"0.1.27\""));
         assert!(updated.contains("image = \"ghcr.io/lvillis/tino:0.1.27@sha256:new\""));
         assert!(updated.contains("image = \"ghcr.io/lvillis/salus:0.1.8@sha256:keep\""));
+    }
+
+    #[test]
+    fn parses_next_link_headers() {
+        let header = r#"</v2/lvillis/tino/tags/list?n=100&last=0.1.1>; rel="next""#;
+
+        assert_eq!(
+            next_link(header).as_deref(),
+            Some("/v2/lvillis/tino/tags/list?n=100&last=0.1.1")
+        );
+        assert_eq!(
+            registry_url("/v2/lvillis/tino/tags/list?n=100"),
+            "https://ghcr.io/v2/lvillis/tino/tags/list?n=100"
+        );
     }
 
     #[test]

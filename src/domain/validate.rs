@@ -29,8 +29,9 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
     let package_pattern = Regex::new(r"^keeline-[a-z0-9-]+$")?;
     let family_pattern = Regex::new(r"^[a-z0-9]+$")?;
     let tool_name_pattern = Regex::new(r"^[a-z][a-z0-9-]*$")?;
-    let image_reference_pattern =
-        Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")?;
+    let image_reference_pattern = Regex::new(
+        r"^(?:scratch|[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$",
+    )?;
     let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
@@ -40,6 +41,7 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
     let sha256_pattern = Regex::new(r"^[a-f0-9]{64}$")?;
 
     let mut ids = HashSet::new();
+    let mut dockerfiles = HashSet::new();
     let mut published_tags = HashSet::new();
 
     for target in &catalog.targets {
@@ -54,6 +56,12 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             "duplicate image id `{}` from {}",
             target.id,
             target.definition_file.display()
+        );
+        ensure!(
+            dockerfiles.insert(target.dockerfile.clone()),
+            "duplicate dockerfile path for image `{}`: {}",
+            target.id,
+            target.dockerfile.display()
         );
 
         ensure!(
@@ -552,11 +560,13 @@ fn validate_tags(
             ),
         }
 
-        ensure!(
-            published_tags.insert((target.package.clone(), tag.clone())),
-            "package `{}` publishes duplicate tag `{tag}`",
-            target.package
-        );
+        if target.is_releasable() {
+            ensure!(
+                published_tags.insert((target.package.clone(), tag.clone())),
+                "package `{}` publishes duplicate releasable tag `{tag}`",
+                target.package
+            );
+        }
     }
 
     for tag in &target.alias_tags {
@@ -589,11 +599,13 @@ fn validate_tags(
             ),
         }
 
-        ensure!(
-            published_tags.insert((target.package.clone(), tag.clone())),
-            "package `{}` publishes duplicate tag `{tag}`",
-            target.package
-        );
+        if target.is_releasable() {
+            ensure!(
+                published_tags.insert((target.package.clone(), tag.clone())),
+                "package `{}` publishes duplicate releasable tag `{tag}`",
+                target.package
+            );
+        }
     }
 
     if target.variant != "default" && target.id.ends_with("-default") {
@@ -612,6 +624,13 @@ mod tests {
 
     use super::{validate_tags, validate_tool_source};
     use crate::domain::model::{ImageTarget, SourceArchive};
+
+    fn image_reference_pattern() -> Regex {
+        Regex::new(
+            r"^(?:scratch|[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$",
+        )
+        .unwrap()
+    }
 
     fn make_target(package: &str, canonical: &[&str], alias: &[&str]) -> ImageTarget {
         ImageTarget {
@@ -733,9 +752,7 @@ mod tests {
     #[test]
     fn accepts_digest_pinned_tool_source_images() {
         let target = make_target("keeline-debian", &["13"], &[]);
-        let image_reference =
-            Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")
-                .unwrap();
+        let image_reference = image_reference_pattern();
         let sha256 = Regex::new(r"^[a-f0-9]{64}$").unwrap();
         let archives: Vec<SourceArchive> = Vec::new();
 
@@ -756,9 +773,7 @@ mod tests {
     #[test]
     fn rejects_mutable_tool_source_images() {
         let target = make_target("keeline-debian", &["13"], &[]);
-        let image_reference =
-            Regex::new(r"^(?:scratch|[a-z0-9./_-]+:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$")
-                .unwrap();
+        let image_reference = image_reference_pattern();
         let sha256 = Regex::new(r"^[a-f0-9]{64}$").unwrap();
         let archives: Vec<SourceArchive> = Vec::new();
 
@@ -767,6 +782,29 @@ mod tests {
                 &target,
                 "init",
                 Some("ghcr.io/lvillis/tino:0.1.26"),
+                &[],
+                &archives,
+                &image_reference,
+                &sha256,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_implicit_registry_image_references() {
+        let target = make_target("keeline-debian", &["13"], &[]);
+        let image_reference = image_reference_pattern();
+        let sha256 = Regex::new(r"^[a-f0-9]{64}$").unwrap();
+        let archives: Vec<SourceArchive> = Vec::new();
+
+        assert!(
+            validate_tool_source(
+                &target,
+                "init",
+                Some(
+                    "tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b",
+                ),
                 &[],
                 &archives,
                 &image_reference,

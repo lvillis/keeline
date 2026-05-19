@@ -187,6 +187,31 @@ canonical = ["13"]
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn discovery_rejects_definitions_without_variants() {
+    let root = unique_temp_dir();
+    let image_dir = root.join("debian/13");
+    fs::create_dir_all(&image_dir).unwrap();
+    fs::write(
+        image_dir.join("image.toml"),
+        r#"
+schema = 1
+family = "debian"
+line = "13"
+version = "13"
+id = "debian-13"
+package = "keeline-debian"
+platforms = ["linux/amd64"]
+"#,
+    )
+    .unwrap();
+
+    let result = ImageCatalog::discover(&root);
+
+    assert!(result.is_err());
+    fs::remove_dir_all(root).unwrap();
+}
+
 fn unique_temp_dir() -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

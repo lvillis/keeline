@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::cli::ListArgs;
 use crate::domain::ImageCatalog;
+use crate::output::Table;
 
 pub fn run(catalog: &ImageCatalog, args: &ListArgs) -> Result<()> {
     catalog.validate()?;
@@ -17,57 +18,18 @@ pub fn run(catalog: &ImageCatalog, args: &ListArgs) -> Result<()> {
         .or_else(|| std::env::var("GITHUB_REPOSITORY_OWNER").ok())
         .unwrap_or_else(|| "<owner>".to_string());
 
-    let headers = ["ID", "STATUS", "GHCR", "CONTEXT"];
-    let rows: Vec<[String; 4]> = catalog
-        .targets
-        .iter()
-        .map(|target| {
-            [
-                target.id.clone(),
-                render_status(target.publish, target.status_label()),
-                format!("{}:{}", target.repository(&owner), target.primary_tag()),
-                target.context.display().to_string(),
-            ]
-        })
-        .collect();
+    let mut table = Table::new(["ID", "STATUS", "GHCR", "CONTEXT"]);
 
-    let widths = column_widths(&headers, &rows);
-
-    println!(
-        "{:<id$}  {:<status$}  {:<ghcr$}  {}",
-        headers[0],
-        headers[1],
-        headers[2],
-        headers[3],
-        id = widths[0],
-        status = widths[1],
-        ghcr = widths[2],
-    );
-    println!(
-        "{:-<id$}  {:-<status$}  {:-<ghcr$}  {:-<context$}",
-        "",
-        "",
-        "",
-        "",
-        id = widths[0],
-        status = widths[1],
-        ghcr = widths[2],
-        context = widths[3],
-    );
-
-    for row in rows {
-        println!(
-            "{:<id$}  {:<status$}  {:<ghcr$}  {}",
-            row[0],
-            row[1],
-            row[2],
-            row[3],
-            id = widths[0],
-            status = widths[1],
-            ghcr = widths[2],
-        );
+    for target in &catalog.targets {
+        table.push_row([
+            target.id.clone(),
+            render_status(target.publish, target.status_label()),
+            format!("{}:{}", target.repository(&owner), target.primary_tag()),
+            target.context.display().to_string(),
+        ]);
     }
 
+    table.print();
     Ok(())
 }
 
@@ -79,39 +41,9 @@ fn render_status(publish: bool, status: &str) -> String {
     }
 }
 
-fn column_widths(headers: &[&str; 4], rows: &[[String; 4]]) -> [usize; 4] {
-    let mut widths = [
-        headers[0].len(),
-        headers[1].len(),
-        headers[2].len(),
-        headers[3].len(),
-    ];
-
-    for row in rows {
-        for (index, value) in row.iter().enumerate() {
-            widths[index] = widths[index].max(value.len());
-        }
-    }
-
-    widths
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{column_widths, render_status};
-
-    #[test]
-    fn computes_widths_from_headers_and_rows() {
-        let headers = ["ID", "STATUS", "GHCR", "CONTEXT"];
-        let rows = vec![[
-            "java-8u372-trixie".to_string(),
-            "stable".to_string(),
-            "ghcr.io/example/keeline-java:8u372-trixie".to_string(),
-            "images/java/8/trixie".to_string(),
-        ]];
-
-        assert_eq!(column_widths(&headers, &rows), [17, 6, 41, 20]);
-    }
+    use super::render_status;
 
     #[test]
     fn renders_hidden_status_label_for_unpublished_targets() {
