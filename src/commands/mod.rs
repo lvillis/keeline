@@ -1,6 +1,8 @@
 use std::process::Command;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, ensure};
+
+use crate::domain::{ImageCatalog, ImageTarget, Platform};
 
 pub mod build;
 pub mod list;
@@ -33,24 +35,50 @@ pub(crate) fn registry_cache_to(repository: &str, cache_tag: &str) -> Vec<String
     )]
 }
 
-pub(crate) fn platform_suffix(platform: &str) -> Result<&'static str> {
+pub(crate) fn platform_suffix(platform: Platform) -> &'static str {
     match platform {
-        "linux/amd64" => Ok("amd64"),
-        "linux/arm64" => Ok("arm64"),
-        _ => bail!("unsupported native release platform `{platform}`"),
+        Platform::LinuxAmd64 => "amd64",
+        Platform::LinuxArm64 => "arm64",
     }
 }
 
-pub(crate) fn platform_runner(platform: &str) -> Result<&'static str> {
+pub(crate) fn platform_runner(platform: Platform) -> &'static str {
     match platform {
-        "linux/amd64" => Ok("ubuntu-latest"),
-        "linux/arm64" => Ok("ubuntu-24.04-arm"),
-        _ => bail!("unsupported native release platform `{platform}`"),
+        Platform::LinuxAmd64 => "ubuntu-latest",
+        Platform::LinuxArm64 => "ubuntu-24.04-arm",
     }
 }
 
 pub(crate) fn tag_with_suffix(tag: &str, suffix: &str) -> String {
     format!("{tag}-{suffix}")
+}
+
+pub(crate) fn select_release_targets<'a>(
+    catalog: &'a ImageCatalog,
+    image_id: Option<&str>,
+) -> Result<Vec<&'a ImageTarget>> {
+    let targets = match image_id {
+        Some(image_id) => {
+            let target = catalog
+                .target(image_id)
+                .with_context(|| format!("unknown image id `{image_id}`"))?;
+            ensure!(
+                target.is_releasable(),
+                "image `{}` is not releasable: publish={}, status={}",
+                target.id,
+                target.publish,
+                target.status_label()
+            );
+            vec![target]
+        }
+        None => catalog.release_targets().collect(),
+    };
+
+    ensure!(
+        !targets.is_empty(),
+        "no releasable image targets were selected"
+    );
+    Ok(targets)
 }
 
 pub(crate) fn oci_image_source() -> String {
@@ -117,19 +145,14 @@ fn normalize_git_url(url: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::{platform_runner, platform_suffix, tag_with_suffix};
+    use crate::domain::Platform;
 
     #[test]
     fn maps_supported_platforms_to_release_suffixes_and_runners() {
-        assert_eq!(platform_suffix("linux/amd64").unwrap(), "amd64");
-        assert_eq!(platform_suffix("linux/arm64").unwrap(), "arm64");
-        assert_eq!(platform_runner("linux/amd64").unwrap(), "ubuntu-latest");
-        assert_eq!(platform_runner("linux/arm64").unwrap(), "ubuntu-24.04-arm");
-    }
-
-    #[test]
-    fn rejects_unsupported_native_release_platforms() {
-        assert!(platform_suffix("linux/arm/v7").is_err());
-        assert!(platform_runner("linux/arm/v7").is_err());
+        assert_eq!(platform_suffix(Platform::LinuxAmd64), "amd64");
+        assert_eq!(platform_suffix(Platform::LinuxArm64), "arm64");
+        assert_eq!(platform_runner(Platform::LinuxAmd64), "ubuntu-latest");
+        assert_eq!(platform_runner(Platform::LinuxArm64), "ubuntu-24.04-arm");
     }
 
     #[test]

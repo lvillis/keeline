@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 
 use crate::cli::BuildArgs;
 use crate::commands::build_args;
-use crate::docker::DockerBuild;
+use crate::docker::{BuildOutput, DockerBuild};
 use crate::domain::ImageCatalog;
 use crate::render;
 
@@ -13,7 +13,14 @@ pub fn run(catalog: &ImageCatalog, args: &BuildArgs) -> Result<()> {
         .target(&args.image_id)
         .with_context(|| format!("unknown image id `{}`", args.image_id))?;
 
-    render::sync_target(target)?;
+    render::check_target(target)?;
+    if let Some(platform) = &args.platform {
+        ensure!(
+            target.platforms.contains(platform),
+            "image `{}` does not support platform `{platform}`",
+            target.id
+        );
+    }
 
     let repository = match &args.owner {
         Some(owner) => format!("ghcr.io/{owner}/{}", target.package),
@@ -28,11 +35,9 @@ pub fn run(catalog: &ImageCatalog, args: &BuildArgs) -> Result<()> {
         cache_to: Vec::new(),
         metadata_file: None,
         tags: vec![format!("{repository}:{}", target.primary_tag())],
-        platforms: args.platform.clone().into_iter().collect(),
-        sbom: false,
-        provenance: false,
-        push: false,
-        load: true,
+        platforms: args.platform.into_iter().collect(),
+        attestations: false,
+        output: BuildOutput::Load,
     };
 
     if args.dry_run {

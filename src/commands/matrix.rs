@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::cli::MatrixArgs;
 use crate::commands::{platform_runner, platform_suffix};
-use crate::domain::{ImageCatalog, ImageTarget};
+use crate::domain::{ImageCatalog, ImageFamily, ImageTarget, Platform};
 
 #[derive(Debug, Serialize)]
 struct Matrix {
@@ -13,7 +13,7 @@ struct Matrix {
 #[derive(Debug, Serialize)]
 struct MatrixEntry {
     id: String,
-    family: String,
+    family: ImageFamily,
     line: String,
     version: String,
     distro: Option<String>,
@@ -24,11 +24,11 @@ struct MatrixEntry {
     context: String,
     dockerfile: String,
     base_image: String,
-    platforms: Vec<String>,
+    platforms: Vec<Platform>,
     canonical: Vec<String>,
     alias: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    platform: Option<String>,
+    platform: Option<Platform>,
     #[serde(skip_serializing_if = "Option::is_none")]
     arch: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -48,7 +48,7 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
         let mut entries = Vec::new();
         for target in targets {
             for platform in &target.platforms {
-                entries.push(entry(target, Some(platform))?);
+                entries.push(entry(target, Some(*platform)));
             }
         }
         entries
@@ -56,7 +56,7 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
         targets
             .into_iter()
             .map(|target| entry(target, None))
-            .collect::<Result<Vec<_>>>()?
+            .collect()
     };
 
     let matrix = Matrix { include };
@@ -70,19 +70,19 @@ pub fn run(catalog: &ImageCatalog, args: &MatrixArgs) -> Result<()> {
     Ok(())
 }
 
-fn entry(target: &ImageTarget, platform: Option<&String>) -> Result<MatrixEntry> {
+fn entry(target: &ImageTarget, platform: Option<Platform>) -> MatrixEntry {
     let (platform, arch, runner) = match platform {
         Some(platform) => (
-            Some(platform.clone()),
-            Some(platform_suffix(platform)?),
-            Some(platform_runner(platform)?),
+            Some(platform),
+            Some(platform_suffix(platform)),
+            Some(platform_runner(platform)),
         ),
         None => (None, None, None),
     };
 
-    Ok(MatrixEntry {
+    MatrixEntry {
         id: target.id.clone(),
-        family: target.family.clone(),
+        family: target.family,
         line: target.line.clone(),
         version: target.version.clone(),
         distro: target.distro.clone(),
@@ -99,5 +99,5 @@ fn entry(target: &ImageTarget, platform: Option<&String>) -> Result<MatrixEntry>
         platform,
         arch,
         runner,
-    })
+    }
 }

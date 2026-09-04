@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ImageStatus {
     Stable,
@@ -11,22 +12,36 @@ pub enum ImageStatus {
     Disabled,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ImageFamily {
+    Debian,
+    Java,
+    Scratch,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub enum Platform {
+    #[serde(rename = "linux/amd64")]
+    LinuxAmd64,
+    #[serde(rename = "linux/arm64")]
+    LinuxArm64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawImageDefinition {
-    #[serde(default = "default_schema")]
     pub schema: u32,
-    pub family: String,
+    pub family: ImageFamily,
     pub line: String,
     pub version: String,
     #[serde(default)]
     pub distro: Option<String>,
     pub id: String,
     pub package: String,
-    #[serde(default = "default_publish")]
     pub publish: bool,
-    #[serde(default = "default_status")]
     pub status: ImageStatus,
-    pub platforms: Vec<String>,
+    pub platforms: Vec<Platform>,
     #[serde(default)]
     pub tools: BTreeMap<String, RawTool>,
     #[serde(default)]
@@ -38,6 +53,7 @@ pub struct RawImageDefinition {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawSource {
     pub provider: String,
     pub release: String,
@@ -49,8 +65,9 @@ pub struct RawSource {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawSourceArchive {
-    pub platform: String,
+    pub platform: Platform,
     pub url: String,
     pub sha256: String,
 }
@@ -65,8 +82,8 @@ pub enum ToolRole {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawTool {
-    #[serde(default = "default_tool_role")]
     pub role: ToolRole,
     pub release: String,
     #[serde(default)]
@@ -84,6 +101,7 @@ pub struct RawTool {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawJavaRuntime {
     pub java_home: String,
     #[serde(default)]
@@ -105,8 +123,8 @@ pub struct RawJavaRuntime {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawVariant {
-    #[serde(default = "default_variant_name")]
     pub name: String,
     pub dockerfile: String,
     pub base_image: String,
@@ -142,7 +160,7 @@ pub struct ImageSource {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SourceArchive {
-    pub platform: String,
+    pub platform: Platform,
     pub url: String,
     pub sha256: String,
 }
@@ -178,7 +196,7 @@ pub struct JavaRuntime {
 pub struct ImageTarget {
     pub schema: u32,
     pub id: String,
-    pub family: String,
+    pub family: ImageFamily,
     pub line: String,
     pub version: String,
     pub distro: Option<String>,
@@ -188,7 +206,7 @@ pub struct ImageTarget {
     pub variant: String,
     pub context: PathBuf,
     pub dockerfile: PathBuf,
-    pub platforms: Vec<String>,
+    pub platforms: Vec<Platform>,
     pub base_image: String,
     pub builder_image: Option<String>,
     pub title: String,
@@ -257,7 +275,7 @@ impl ImageTarget {
         format!("ghcr.io/{owner}/{}", self.package)
     }
 
-    pub fn source_archive_for_platform(&self, platform: &str) -> Option<&SourceArchive> {
+    pub fn source_archive_for_platform(&self, platform: Platform) -> Option<&SourceArchive> {
         self.source
             .as_ref()?
             .archives
@@ -282,20 +300,8 @@ impl ImageTarget {
     }
 }
 
-pub fn default_variant_name() -> String {
-    "default".to_string()
-}
-
-pub fn default_schema() -> u32 {
-    1
-}
-
 pub fn default_strip_components() -> u8 {
     1
-}
-
-pub fn default_tool_role() -> ToolRole {
-    ToolRole::Utility
 }
 
 pub fn default_lang() -> String {
@@ -314,20 +320,57 @@ pub fn default_generate_locales() -> bool {
     true
 }
 
-pub fn default_publish() -> bool {
-    true
-}
-
-pub fn default_status() -> ImageStatus {
-    ImageStatus::Stable
-}
-
 impl ImageStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Stable => "stable",
             Self::Experimental => "experimental",
             Self::Disabled => "disabled",
+        }
+    }
+}
+
+impl ImageFamily {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Debian => "debian",
+            Self::Java => "java",
+            Self::Scratch => "scratch",
+        }
+    }
+}
+
+impl std::fmt::Display for ImageFamily {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl Platform {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LinuxAmd64 => "linux/amd64",
+            Self::LinuxArm64 => "linux/arm64",
+        }
+    }
+}
+
+impl std::fmt::Display for Platform {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Platform {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "linux/amd64" => Ok(Self::LinuxAmd64),
+            "linux/arm64" => Ok(Self::LinuxArm64),
+            _ => Err(format!(
+                "unsupported platform `{value}`; expected `linux/amd64` or `linux/arm64`"
+            )),
         }
     }
 }
@@ -354,13 +397,26 @@ impl ToolRole {
 
 #[cfg(test)]
 mod tests {
-    use super::{ImageCatalog, ImageStatus, ImageTarget};
+    use super::{ImageCatalog, ImageFamily, ImageStatus, ImageTarget, Platform};
+
+    #[test]
+    fn parses_only_supported_platforms() {
+        assert_eq!(
+            "linux/amd64".parse::<Platform>().unwrap(),
+            Platform::LinuxAmd64
+        );
+        assert_eq!(
+            "linux/arm64".parse::<Platform>().unwrap(),
+            Platform::LinuxArm64
+        );
+        assert!("linux/ppc64le".parse::<Platform>().is_err());
+    }
 
     fn make_target(id: &str, publish: bool, status: ImageStatus) -> ImageTarget {
         ImageTarget {
             schema: 1,
             id: id.to_string(),
-            family: "java".to_string(),
+            family: ImageFamily::Java,
             line: "21".to_string(),
             version: "21.0.10".to_string(),
             distro: Some("trixie".to_string()),
@@ -370,7 +426,7 @@ mod tests {
             variant: "default".to_string(),
             context: "images/java/21/trixie".into(),
             dockerfile: "images/java/21/trixie/Dockerfile".into(),
-            platforms: vec!["linux/amd64".to_string()],
+            platforms: vec![Platform::LinuxAmd64],
             base_image: "docker.io/library/debian:13".to_string(),
             builder_image: None,
             title: "Sample".to_string(),

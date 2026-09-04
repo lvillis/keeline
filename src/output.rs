@@ -1,25 +1,19 @@
 #[derive(Debug, Clone)]
-pub struct Table {
-    headers: Vec<String>,
-    rows: Vec<Vec<String>>,
+pub struct Table<const COLUMNS: usize> {
+    headers: [String; COLUMNS],
+    rows: Vec<[String; COLUMNS]>,
 }
 
-impl Table {
-    pub fn new(headers: impl IntoIterator<Item = impl Into<String>>) -> Self {
+impl<const COLUMNS: usize> Table<COLUMNS> {
+    pub fn new<T: Into<String>>(headers: [T; COLUMNS]) -> Self {
         Self {
-            headers: headers.into_iter().map(Into::into).collect(),
+            headers: headers.map(Into::into),
             rows: Vec::new(),
         }
     }
 
-    pub fn push_row(&mut self, row: impl IntoIterator<Item = impl Into<String>>) {
-        let row = row.into_iter().map(Into::into).collect::<Vec<_>>();
-        assert_eq!(
-            row.len(),
-            self.headers.len(),
-            "table row width must match header width"
-        );
-        self.rows.push(row);
+    pub fn push_row<T: Into<String>>(&mut self, row: [T; COLUMNS]) {
+        self.rows.push(row.map(Into::into));
     }
 
     pub fn print(&self) {
@@ -43,7 +37,7 @@ impl Table {
     }
 }
 
-impl std::fmt::Display for Table {
+impl<const COLUMNS: usize> std::fmt::Display for Table<COLUMNS> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let widths = self.widths();
 

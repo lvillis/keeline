@@ -50,14 +50,17 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: Verify release inputs
+        run: cargo run --quiet --locked -- verify
+
       - name: Generate release matrix
         id: matrix
         env:
           INPUT_IMAGE_ID: ${{ inputs.image_id }}
         run: |
           set -euo pipefail
-          merge_matrix_json="$(cargo run --quiet -- matrix)"
-          build_matrix_json="$(cargo run --quiet -- matrix --per-platform)"
+          merge_matrix_json="$(cargo run --quiet --locked -- matrix)"
+          build_matrix_json="$(cargo run --quiet --locked -- matrix --per-platform)"
 
           if [ -n "${INPUT_IMAGE_ID:-}" ]; then
             merge_matrix_json="$(jq --arg image_id "$INPUT_IMAGE_ID" '{include: [.include[] | select(.id == $image_id)]}' <<<"$merge_matrix_json")"
@@ -118,7 +121,7 @@ jobs:
         env:
           KEELINE_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
           KEELINE_IMAGE_REVISION: ${{ github.sha }}
-        run: cargo run -- release "${{ matrix.id }}" --owner "${{ github.repository_owner }}" --platform "${{ matrix.platform }}"
+        run: cargo run --locked -- release "${{ matrix.id }}" --owner "${{ github.repository_owner }}" --platform "${{ matrix.platform }}"
 
       - name: Upload build metadata
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -172,4 +175,4 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish manifest for ${{ matrix.id }}
-        run: cargo run -- manifest "${{ matrix.id }}" --owner "${{ github.repository_owner }}"
+        run: cargo run --locked -- manifest "${{ matrix.id }}" --owner "${{ github.repository_owner }}"

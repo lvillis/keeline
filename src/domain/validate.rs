@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use anyhow::{Result, bail, ensure};
 use regex::Regex;
 
-use crate::domain::model::{ImageCatalog, ImageTarget, SourceArchive, ToolRole, ToolRuntime};
+use crate::domain::model::{
+    ImageCatalog, ImageFamily, ImageTarget, SourceArchive, ToolRole, ToolRuntime,
+};
 
 const BANNED_TAGS: &[&str] = &[
     "latest",
@@ -27,12 +29,10 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
     );
 
     let package_pattern = Regex::new(r"^keeline-[a-z0-9-]+$")?;
-    let family_pattern = Regex::new(r"^[a-z0-9]+$")?;
     let tool_name_pattern = Regex::new(r"^[a-z][a-z0-9-]*$")?;
     let image_reference_pattern = Regex::new(
         r"^(?:scratch|[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+(?:@sha256:[a-f0-9]{64})?)$",
     )?;
-    let platform_pattern = Regex::new(r"^[a-z0-9]+/[a-z0-9]+$")?;
     let debian_canonical = Regex::new(r"^[0-9]+(?:\.[0-9]+)?(?:-[a-z0-9]+)?$")?;
     let debian_alias = Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)?$")?;
     let java_canonical =
@@ -63,18 +63,28 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             target.id,
             target.dockerfile.display()
         );
+        ensure!(
+            target.definition_file.parent() == Some(target.context.as_path()),
+            "image `{}` definition must be located directly in its build context",
+            target.id
+        );
+        ensure!(
+            target.dockerfile.parent() == Some(target.context.as_path()),
+            "image `{}` dockerfile must be located directly in its build context: {}",
+            target.id,
+            target.dockerfile.display()
+        );
+        ensure!(
+            target.dockerfile != target.definition_file,
+            "image `{}` dockerfile cannot overwrite its image definition",
+            target.id
+        );
 
         ensure!(
             package_pattern.is_match(&target.package),
             "package `{}` is invalid for {}",
             target.package,
             target.definition_file.display()
-        );
-        ensure!(
-            family_pattern.is_match(&target.family),
-            "image `{}` declares invalid family `{}`",
-            target.id,
-            target.family
         );
         ensure!(
             target.package == format!("keeline-{}", target.family),
@@ -124,10 +134,11 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             target.id
         );
 
+        let mut platforms = HashSet::new();
         for platform in &target.platforms {
             ensure!(
-                platform_pattern.is_match(platform),
-                "image `{}` declares invalid platform `{platform}`",
+                platforms.insert(platform),
+                "image `{}` repeats platform `{platform}`",
                 target.id
             );
         }
@@ -139,18 +150,10 @@ pub fn validate(catalog: &ImageCatalog) -> Result<()> {
             &sha256_pattern,
         )?;
 
-        match target.family.as_str() {
-            "debian" => validate_debian_target(target)?,
-            "java" => validate_java_target(target, &sha256_pattern)?,
-            "scratch" => validate_scratch_target(target)?,
-            _ => {
-                ensure!(
-                    target.source.is_none(),
-                    "image `{}` family `{}` cannot declare a source yet",
-                    target.id,
-                    target.family
-                );
-            }
+        match target.family {
+            ImageFamily::Debian => validate_debian_target(target)?,
+            ImageFamily::Java => validate_java_target(target, &sha256_pattern)?,
+            ImageFamily::Scratch => validate_scratch_target(target)?,
         }
 
         validate_tags(
@@ -367,7 +370,7 @@ fn validate_tool_source(
     let mut seen_archives = HashSet::new();
     for archive in archives {
         ensure!(
-            seen_archives.insert(archive.platform.clone()),
+            seen_archives.insert(archive.platform),
             "image `{}` tool `{tool_name}` repeats archive for platform `{}`",
             target.id,
             archive.platform
@@ -484,7 +487,7 @@ fn validate_java_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<
 
     for archive in &source.archives {
         ensure!(
-            seen_archives.insert(archive.platform.clone()),
+            seen_archives.insert(archive.platform),
             "java image `{}` repeats archive for platform `{}`",
             target.id,
             archive.platform
@@ -511,7 +514,7 @@ fn validate_java_target(target: &ImageTarget, sha256_pattern: &Regex) -> Result<
 
     for platform in &target.platforms {
         ensure!(
-            target.source_archive_for_platform(platform).is_some(),
+            target.source_archive_for_platform(*platform).is_some(),
             "java image `{}` is missing a source archive for platform `{platform}`",
             target.id
         );
@@ -542,18 +545,18 @@ fn validate_tags(
             target.id
         );
 
-        match target.family.as_str() {
-            "debian" => ensure!(
+        match target.family {
+            ImageFamily::Debian => ensure!(
                 debian_canonical.is_match(tag),
                 "debian image `{}` has invalid canonical tag `{tag}`",
                 target.id
             ),
-            "java" => ensure!(
+            ImageFamily::Java => ensure!(
                 java_canonical.is_match(tag),
                 "java image `{}` has invalid canonical tag `{tag}`",
                 target.id
             ),
-            _ => ensure!(
+            ImageFamily::Scratch => ensure!(
                 generic_tag.is_match(tag),
                 "image `{}` has invalid canonical tag `{tag}`",
                 target.id
@@ -581,18 +584,18 @@ fn validate_tags(
             target.id
         );
 
-        match target.family.as_str() {
-            "debian" => ensure!(
+        match target.family {
+            ImageFamily::Debian => ensure!(
                 debian_alias.is_match(tag),
                 "debian image `{}` has invalid alias tag `{tag}`",
                 target.id
             ),
-            "java" => ensure!(
+            ImageFamily::Java => ensure!(
                 java_canonical.is_match(tag) || generic_tag.is_match(tag),
                 "java image `{}` has invalid alias tag `{tag}`",
                 target.id
             ),
-            _ => ensure!(
+            ImageFamily::Scratch => ensure!(
                 generic_tag.is_match(tag),
                 "image `{}` has invalid alias tag `{tag}`",
                 target.id
@@ -623,7 +626,7 @@ mod tests {
     use regex::Regex;
 
     use super::{validate_tags, validate_tool_source};
-    use crate::domain::model::{ImageTarget, SourceArchive};
+    use crate::domain::model::{ImageFamily, ImageTarget, Platform, SourceArchive};
 
     fn image_reference_pattern() -> Regex {
         Regex::new(
@@ -636,7 +639,12 @@ mod tests {
         ImageTarget {
             schema: 1,
             id: "sample".to_string(),
-            family: package.trim_start_matches("keeline-").to_string(),
+            family: match package {
+                "keeline-debian" => ImageFamily::Debian,
+                "keeline-java" => ImageFamily::Java,
+                "keeline-scratch" => ImageFamily::Scratch,
+                _ => panic!("unsupported test package `{package}`"),
+            },
             line: "21".to_string(),
             version: "21.0.10".to_string(),
             distro: Some("trixie".to_string()),
@@ -646,7 +654,7 @@ mod tests {
             variant: "default".to_string(),
             context: "images/sample".into(),
             dockerfile: "images/sample/Dockerfile".into(),
-            platforms: vec!["linux/amd64".to_string()],
+            platforms: vec![Platform::LinuxAmd64],
             base_image: "docker.io/library/debian:13".to_string(),
             builder_image: None,
             title: "Sample".to_string(),

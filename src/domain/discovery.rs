@@ -42,7 +42,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                 .archives
                 .iter()
                 .map(|archive| SourceArchive {
-                    platform: archive.platform.clone(),
+                    platform: archive.platform,
                     url: archive.url.clone(),
                     sha256: archive.sha256.clone(),
                 })
@@ -65,7 +65,7 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
                     .archives
                     .iter()
                     .map(|archive| SourceArchive {
-                        platform: archive.platform.clone(),
+                        platform: archive.platform,
                         url: archive.url.clone(),
                         sha256: archive.sha256.clone(),
                     })
@@ -118,13 +118,13 @@ pub fn discover(root: &Path) -> Result<ImageCatalog> {
             targets.push(ImageTarget {
                 schema: definition.schema,
                 id,
-                family: definition.family.clone(),
+                family: definition.family,
                 line: definition.line.clone(),
                 version: definition.version.clone(),
                 distro: definition.distro.clone(),
                 package: definition.package.clone(),
                 publish: definition.publish,
-                status: definition.status.clone(),
+                status: definition.status,
                 variant: variant.name,
                 context: context_dir.to_path_buf(),
                 dockerfile: context_dir.join(variant.dockerfile),

@@ -27,15 +27,7 @@ pub fn run(catalog: &ImageCatalog, args: &RenderArgs) -> Result<()> {
         return Ok(());
     }
 
-    let mut summary = SyncSummary::default();
-    for target in targets {
-        match render::sync_target(target)? {
-            render::SyncStatus::Generated => summary.generated += 1,
-            render::SyncStatus::Updated => summary.updated += 1,
-            render::SyncStatus::Unchanged => summary.unchanged += 1,
-        }
-    }
-
+    let summary = render::sync_targets(targets)?;
     println!("{}", render_message(summary));
     Ok(())
 }

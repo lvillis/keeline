@@ -1,81 +1,40 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Result, ensure};
 
 use crate::cli::ReleaseArgs;
 use crate::commands::{
     RELEASE_METADATA_DIR, build_args, platform_suffix, registry_cache_from, registry_cache_to,
-    tag_with_suffix,
+    select_release_targets, tag_with_suffix,
 };
-use crate::docker::DockerBuild;
+use crate::docker::{BuildOutput, DockerBuild};
 use crate::domain::{ImageCatalog, ImageTarget};
 use crate::render;
 
 pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
     catalog.validate()?;
 
-    let targets: Vec<&ImageTarget> = match &args.image_id {
-        Some(image_id) => vec![{
-            let target = catalog
-                .target(image_id)
-                .with_context(|| format!("unknown image id `{image_id}`"))?;
-            ensure!(
-                target.is_releasable(),
-                "image `{}` is not releasable: publish={}, status={}",
-                target.id,
-                target.publish,
-                target.status_label()
-            );
-            target
-        }],
-        None => catalog.release_targets().collect(),
-    };
+    let targets = select_release_targets(catalog, args.image_id.as_deref())?;
 
-    ensure!(
-        !targets.is_empty(),
-        "no releasable image targets were selected"
-    );
-
-    let tag_suffix = match (&args.platform, &args.tag_suffix) {
-        (Some(platform), Some(suffix)) => {
-            ensure!(
-                !suffix.trim().is_empty(),
-                "release tag suffix cannot be empty when --platform is used"
-            );
-            platform_suffix(platform)?;
-            Some(suffix.clone())
-        }
-        (Some(platform), None) => Some(platform_suffix(platform)?.to_string()),
-        (None, Some(_)) => bail!("--tag-suffix can only be used together with --platform"),
-        (None, None) => None,
-    };
+    let tag_suffix = platform_suffix(args.platform);
 
     for target in targets {
-        render::sync_target(target)?;
+        render::check_target(target)?;
 
-        let platforms = if let Some(platform) = &args.platform {
-            ensure!(
-                target.platforms.contains(platform),
-                "image `{}` does not support platform `{platform}`",
-                target.id
-            );
-            vec![platform.clone()]
-        } else {
-            target.platforms.clone()
-        };
+        ensure!(
+            target.platforms.contains(&args.platform),
+            "image `{}` does not support platform `{}`",
+            target.id,
+            args.platform
+        );
+        let platforms = vec![args.platform];
 
         let repository = target.repository(&args.owner);
-        let cache_tag = match &tag_suffix {
-            Some(suffix) => format!("buildcache-{suffix}"),
-            None => "buildcache".to_string(),
-        };
+        let cache_tag = format!("buildcache-{tag_suffix}");
         let tags = target
             .all_tags()
             .into_iter()
-            .map(|tag| match &tag_suffix {
-                Some(suffix) => format!("{repository}:{}", tag_with_suffix(&tag, suffix)),
-                None => format!("{repository}:{tag}"),
-            })
+            .map(|tag| format!("{repository}:{}", tag_with_suffix(&tag, tag_suffix)))
             .collect();
 
         let request = DockerBuild {
@@ -84,13 +43,11 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
             build_args: build_args(),
             cache_from: registry_cache_from(&repository, &cache_tag),
             cache_to: registry_cache_to(&repository, &cache_tag),
-            metadata_file: Some(metadata_file(target, tag_suffix.as_deref())),
+            metadata_file: Some(metadata_file(target, tag_suffix)),
             tags,
             platforms,
-            sbom: true,
-            provenance: true,
-            push: true,
-            load: false,
+            attestations: true,
+            output: BuildOutput::Push,
         };
 
         if args.dry_run {
@@ -104,11 +61,7 @@ pub fn run(catalog: &ImageCatalog, args: &ReleaseArgs) -> Result<()> {
     Ok(())
 }
 
-fn metadata_file(target: &ImageTarget, tag_suffix: Option<&str>) -> PathBuf {
-    let file_name = match tag_suffix {
-        Some(suffix) => format!("{}-{suffix}.json", target.id),
-        None => format!("{}.json", target.id),
-    };
-
+fn metadata_file(target: &ImageTarget, tag_suffix: &str) -> PathBuf {
+    let file_name = format!("{}-{tag_suffix}.json", target.id);
     PathBuf::from(RELEASE_METADATA_DIR).join(file_name)
 }

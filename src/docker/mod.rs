@@ -1,8 +1,26 @@
+use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::process::Command;
 use std::{fs, path::Path};
 
 use anyhow::{Context, Result, bail};
+
+use crate::domain::Platform;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildOutput {
+    Load,
+    Push,
+}
+
+impl BuildOutput {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Load => "--load",
+            Self::Push => "--push",
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct DockerBuild {
@@ -13,11 +31,9 @@ pub struct DockerBuild {
     pub cache_to: Vec<String>,
     pub metadata_file: Option<PathBuf>,
     pub tags: Vec<String>,
-    pub platforms: Vec<String>,
-    pub sbom: bool,
-    pub provenance: bool,
-    pub push: bool,
-    pub load: bool,
+    pub platforms: Vec<Platform>,
+    pub attestations: bool,
+    pub output: BuildOutput,
 }
 
 #[derive(Debug, Clone)]
@@ -29,120 +45,68 @@ pub struct DockerManifest {
 
 impl DockerBuild {
     pub fn display(&self) -> String {
-        let mut parts = vec![
-            "docker".to_string(),
-            "buildx".to_string(),
-            "build".to_string(),
-        ];
+        display_command("docker", &self.arguments())
+    }
 
-        parts.push("--file".to_string());
-        parts.push(self.dockerfile.display().to_string());
+    fn arguments(&self) -> Vec<OsString> {
+        let mut parts = vec![OsString::from("buildx"), OsString::from("build")];
+
+        parts.push(OsString::from("--file"));
+        parts.push(self.dockerfile.as_os_str().to_owned());
 
         for (name, value) in &self.build_args {
-            parts.push("--build-arg".to_string());
-            parts.push(format!("{name}={value}"));
+            parts.push(OsString::from("--build-arg"));
+            parts.push(OsString::from(format!("{name}={value}")));
         }
 
         for cache_from in &self.cache_from {
-            parts.push("--cache-from".to_string());
-            parts.push(cache_from.clone());
+            parts.push(OsString::from("--cache-from"));
+            parts.push(OsString::from(cache_from));
         }
 
         for cache_to in &self.cache_to {
-            parts.push("--cache-to".to_string());
-            parts.push(cache_to.clone());
+            parts.push(OsString::from("--cache-to"));
+            parts.push(OsString::from(cache_to));
         }
 
         if let Some(metadata_file) = &self.metadata_file {
-            parts.push("--metadata-file".to_string());
-            parts.push(metadata_file.display().to_string());
+            parts.push(OsString::from("--metadata-file"));
+            parts.push(metadata_file.as_os_str().to_owned());
         }
 
         if !self.platforms.is_empty() {
-            parts.push("--platform".to_string());
-            parts.push(self.platforms.join(","));
+            parts.push(OsString::from("--platform"));
+            parts.push(OsString::from(
+                self.platforms
+                    .iter()
+                    .map(|platform| platform.as_str())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ));
         }
 
-        if self.sbom {
-            parts.push("--sbom=true".to_string());
-        }
-
-        if self.provenance {
-            parts.push("--provenance=true".to_string());
+        if self.attestations {
+            parts.push(OsString::from("--sbom=true"));
+            parts.push(OsString::from("--provenance=true"));
         }
 
         for tag in &self.tags {
-            parts.push("--tag".to_string());
-            parts.push(tag.clone());
+            parts.push(OsString::from("--tag"));
+            parts.push(OsString::from(tag));
         }
 
-        if self.push {
-            parts.push("--push".to_string());
-        }
-
-        if self.load {
-            parts.push("--load".to_string());
-        }
-
-        parts.push(self.context.display().to_string());
-
-        display_command(&parts)
+        parts.push(OsString::from(self.output.argument()));
+        parts.push(self.context.as_os_str().to_owned());
+        parts
     }
 
     pub fn run(&self) -> Result<()> {
-        if self.push && self.load {
-            bail!("docker build request cannot use both --push and --load");
-        }
-
         if let Some(metadata_file) = &self.metadata_file {
             create_parent_dir(metadata_file)?;
         }
 
         let mut command = Command::new("docker");
-        command.arg("buildx").arg("build");
-        command.arg("--file").arg(&self.dockerfile);
-
-        for (name, value) in &self.build_args {
-            command.arg("--build-arg").arg(format!("{name}={value}"));
-        }
-
-        for cache_from in &self.cache_from {
-            command.arg("--cache-from").arg(cache_from);
-        }
-
-        for cache_to in &self.cache_to {
-            command.arg("--cache-to").arg(cache_to);
-        }
-
-        if let Some(metadata_file) = &self.metadata_file {
-            command.arg("--metadata-file").arg(metadata_file);
-        }
-
-        if !self.platforms.is_empty() {
-            command.arg("--platform").arg(self.platforms.join(","));
-        }
-
-        if self.sbom {
-            command.arg("--sbom=true");
-        }
-
-        if self.provenance {
-            command.arg("--provenance=true");
-        }
-
-        for tag in &self.tags {
-            command.arg("--tag").arg(tag);
-        }
-
-        if self.push {
-            command.arg("--push");
-        }
-
-        if self.load {
-            command.arg("--load");
-        }
-
-        command.arg(&self.context);
+        command.args(self.arguments());
 
         let status = command
             .status()
@@ -158,25 +122,28 @@ impl DockerBuild {
 
 impl DockerManifest {
     pub fn display(&self) -> String {
+        display_command("docker", &self.arguments())
+    }
+
+    fn arguments(&self) -> Vec<OsString> {
         let mut parts = vec![
-            "docker".to_string(),
-            "buildx".to_string(),
-            "imagetools".to_string(),
-            "create".to_string(),
+            OsString::from("buildx"),
+            OsString::from("imagetools"),
+            OsString::from("create"),
         ];
 
         for tag in &self.tags {
-            parts.push("--tag".to_string());
-            parts.push(tag.clone());
+            parts.push(OsString::from("--tag"));
+            parts.push(OsString::from(tag));
         }
 
         for (name, value) in &self.annotations {
-            parts.push("--annotation".to_string());
-            parts.push(format!("{name}={value}"));
+            parts.push(OsString::from("--annotation"));
+            parts.push(OsString::from(format!("{name}={value}")));
         }
 
-        parts.extend(self.sources.iter().cloned());
-        display_command(&parts)
+        parts.extend(self.sources.iter().map(OsString::from));
+        parts
     }
 
     pub fn run(&self) -> Result<()> {
@@ -188,17 +155,7 @@ impl DockerManifest {
         }
 
         let mut command = Command::new("docker");
-        command.arg("buildx").arg("imagetools").arg("create");
-
-        for tag in &self.tags {
-            command.arg("--tag").arg(tag);
-        }
-
-        for (name, value) in &self.annotations {
-            command.arg("--annotation").arg(format!("{name}={value}"));
-        }
-
-        command.args(&self.sources);
+        command.args(self.arguments());
 
         let status = command
             .status()
@@ -223,20 +180,21 @@ fn create_parent_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn display_command(parts: &[String]) -> String {
-    parts
-        .iter()
-        .map(|part| shell_quote(part))
+fn display_command(program: &str, arguments: &[OsString]) -> String {
+    std::iter::once(OsStr::new(program))
+        .chain(arguments.iter().map(OsString::as_os_str))
+        .map(shell_quote)
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-fn shell_quote(value: &str) -> String {
+fn shell_quote(value: &OsStr) -> String {
+    let value = value.to_string_lossy();
     if value
         .bytes()
         .all(|byte| matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' | b'.' | b'/' | b':' | b'=' | b',' | b'@'))
     {
-        return value.to_string();
+        return value.into_owned();
     }
 
     format!("'{}'", value.replace('\'', "'\\''"))
@@ -246,7 +204,8 @@ fn shell_quote(value: &str) -> String {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{DockerBuild, DockerManifest};
+    use super::{BuildOutput, DockerBuild, DockerManifest};
+    use crate::domain::Platform;
 
     #[test]
     fn display_includes_explicit_cache_options() {
@@ -265,11 +224,9 @@ mod tests {
             ],
             metadata_file: Some(PathBuf::from("target/keeline-release-metadata/sample.json")),
             tags: vec!["ghcr.io/example/keeline-java:21-trixie".to_string()],
-            platforms: vec!["linux/amd64".to_string(), "linux/arm64".to_string()],
-            sbom: true,
-            provenance: true,
-            push: true,
-            load: false,
+            platforms: vec![Platform::LinuxAmd64, Platform::LinuxArm64],
+            attestations: true,
+            output: BuildOutput::Push,
         };
 
         let display = request.display();
@@ -283,6 +240,8 @@ mod tests {
         assert!(display.contains("--metadata-file target/keeline-release-metadata/sample.json"));
         assert!(display.contains("--sbom=true"));
         assert!(display.contains("--provenance=true"));
+        assert!(display.contains("--push"));
+        assert!(!display.contains("--load"));
     }
 
     #[test]

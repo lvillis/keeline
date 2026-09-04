@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands;
-use crate::domain::ImageCatalog;
+use crate::domain::{ImageCatalog, Platform};
 
 #[derive(Debug, Parser)]
 #[command(name = "keeline")]
@@ -92,6 +92,9 @@ pub struct ToolUpdateArgs {
     pub dry_run: bool,
     #[arg(long)]
     pub allow_major: bool,
+    /// Trust a new digest when an existing version tag has been republished.
+    #[arg(long)]
+    pub accept_digest_change: bool,
 }
 
 #[derive(Debug, Args)]
@@ -100,7 +103,7 @@ pub struct BuildArgs {
     #[arg(long)]
     pub owner: Option<String>,
     #[arg(long)]
-    pub platform: Option<String>,
+    pub platform: Option<Platform>,
     #[arg(long)]
     pub dry_run: bool,
 }
@@ -111,9 +114,7 @@ pub struct ReleaseArgs {
     #[arg(long)]
     pub owner: String,
     #[arg(long)]
-    pub platform: Option<String>,
-    #[arg(long)]
-    pub tag_suffix: Option<String>,
+    pub platform: Platform,
     #[arg(long)]
     pub dry_run: bool,
 }

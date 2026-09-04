@@ -5,7 +5,7 @@
 [![crates.io](https://img.shields.io/crates/v/keeline?logo=rust)](https://crates.io/crates/keeline)
 [![docs.rs](https://img.shields.io/docsrs/keeline)](https://docs.rs/keeline)
 [![License](https://img.shields.io/crates/l/keeline)](LICENSE)
-[![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B-b7410e?logo=rust)](Cargo.toml)
+[![Rust 1.98+](https://img.shields.io/badge/rust-1.98%2B-b7410e?logo=rust)](Cargo.toml)
 
 [![GHCR Debian](https://img.shields.io/badge/ghcr-keeline--debian-0969da?logo=github)](https://github.com/users/lvillis/packages/container/package/keeline-debian)
 [![GHCR Java](https://img.shields.io/badge/ghcr-keeline--java-0969da?logo=github)](https://github.com/users/lvillis/packages/container/package/keeline-java)
