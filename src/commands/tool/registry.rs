@@ -226,19 +226,19 @@ mod tests {
 
     #[test]
     fn parses_same_origin_next_links() {
-        let header = r#"</v2/lvillis/tino/tags/list?n=100&last=0.1.1>; rel="next""#;
+        let header = r#"</v2/oksyd/tino/tags/list?n=100&last=0.1.1>; rel="next""#;
 
         assert_eq!(
             next_link(header).unwrap().as_deref(),
-            Some("/v2/lvillis/tino/tags/list?n=100&last=0.1.1")
+            Some("/v2/oksyd/tino/tags/list?n=100&last=0.1.1")
         );
         assert_eq!(
-            registry_url("/v2/lvillis/tino/tags/list?n=100").unwrap(),
-            "https://ghcr.io/v2/lvillis/tino/tags/list?n=100"
+            registry_url("/v2/oksyd/tino/tags/list?n=100").unwrap(),
+            "https://ghcr.io/v2/oksyd/tino/tags/list?n=100"
         );
         assert_eq!(
-            registry_url("https://ghcr.io/v2/lvillis/tino/tags/list?n=100").unwrap(),
-            "https://ghcr.io/v2/lvillis/tino/tags/list?n=100"
+            registry_url("https://ghcr.io/v2/oksyd/tino/tags/list?n=100").unwrap(),
+            "https://ghcr.io/v2/oksyd/tino/tags/list?n=100"
         );
     }
 

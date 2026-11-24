@@ -215,26 +215,26 @@ mod tests {
     fn updates_only_the_selected_tool_block() {
         let contents = r#"[tools.tino]
 release = "0.1.26"
-image = "ghcr.io/lvillis/tino:0.1.26@sha256:old"
+image = "ghcr.io/oksyd/tino:0.1.26@sha256:old"
 
 [tools.salus]
-release = "0.1.8"
-image = "ghcr.io/lvillis/salus:0.1.8@sha256:keep"
+release = "0.1.12"
+image = "ghcr.io/oksyd/salus:0.1.12@sha256:keep"
 "#;
         let update = PlannedToolUpdate {
             name: "tino".to_string(),
             old_release: "0.1.26".to_string(),
             new_release: "0.1.27".to_string(),
-            old_image: "ghcr.io/lvillis/tino:0.1.26@sha256:old".to_string(),
-            new_image: "ghcr.io/lvillis/tino:0.1.27@sha256:new".to_string(),
+            old_image: "ghcr.io/oksyd/tino:0.1.26@sha256:old".to_string(),
+            new_image: "ghcr.io/oksyd/tino:0.1.27@sha256:new".to_string(),
             definition_files: Default::default(),
         };
 
         let updated = update_tool_block(contents, &update).unwrap();
 
         assert!(updated.contains("release = \"0.1.27\""));
-        assert!(updated.contains("image = \"ghcr.io/lvillis/tino:0.1.27@sha256:new\""));
-        assert!(updated.contains("image = \"ghcr.io/lvillis/salus:0.1.8@sha256:keep\""));
+        assert!(updated.contains("image = \"ghcr.io/oksyd/tino:0.1.27@sha256:new\""));
+        assert!(updated.contains("image = \"ghcr.io/oksyd/salus:0.1.12@sha256:keep\""));
     }
 
     #[test]
@@ -252,20 +252,15 @@ image = "ghcr.io/lvillis/salus:0.1.8@sha256:keep"
 
         let catalog = ImageCatalog::discover(&root).unwrap();
         catalog.validate().unwrap();
-        let old_image = catalog
-            .target("scratch-1")
-            .unwrap()
-            .tool("tino")
-            .unwrap()
-            .image
-            .clone()
-            .unwrap();
+        let tino = catalog.target("scratch-1").unwrap().tool("tino").unwrap();
+        let new_release = "0.1.40";
+        let new_image = format!("ghcr.io/oksyd/tino:{new_release}@sha256:{}", "a".repeat(64));
         let update = PlannedToolUpdate {
             name: "tino".to_string(),
-            old_release: "0.1.33".to_string(),
-            new_release: "0.1.34".to_string(),
-            old_image,
-            new_image: format!("ghcr.io/lvillis/tino:0.1.34@sha256:{}", "a".repeat(64)),
+            old_release: tino.release.clone(),
+            new_release: new_release.to_string(),
+            old_image: tino.image.clone().unwrap(),
+            new_image: new_image.clone(),
             definition_files: BTreeSet::from([image_dir.join("image.toml")]),
         };
 
@@ -282,12 +277,12 @@ image = "ghcr.io/lvillis/salus:0.1.8@sha256:keep"
                 .tool("tino")
                 .unwrap()
                 .release,
-            "0.1.34"
+            new_release
         );
         assert!(
             fs::read_to_string(image_dir.join("Dockerfile"))
                 .unwrap()
-                .contains("ghcr.io/lvillis/tino:0.1.34@sha256:")
+                .contains(&new_image)
         );
 
         fs::remove_dir_all(root).unwrap();

@@ -768,7 +768,7 @@ mod tests {
             &target,
             "init",
             Some(
-                "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b",
+                "ghcr.io/oksyd/tino:0.1.39@sha256:db6eab0577c7cc22b53cced7ab379df296c7f6f8938e51a7a8efbf5aaf7b6e5d",
             ),
             &[],
             &archives,
@@ -789,7 +789,7 @@ mod tests {
             validate_tool_source(
                 &target,
                 "init",
-                Some("ghcr.io/lvillis/tino:0.1.26"),
+                Some("ghcr.io/oksyd/tino:0.1.39"),
                 &[],
                 &archives,
                 &image_reference,
@@ -811,7 +811,7 @@ mod tests {
                 &target,
                 "init",
                 Some(
-                    "tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b",
+                    "tino:0.1.39@sha256:db6eab0577c7cc22b53cced7ab379df296c7f6f8938e51a7a8efbf5aaf7b6e5d",
                 ),
                 &[],
                 &archives,

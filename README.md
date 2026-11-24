@@ -13,8 +13,9 @@
 
 Keeline provides small, predictable runtime container images published to GHCR.
 The image line includes Debian, Debian-based Java runtimes, and a minimal
-scratch tool image. Every image bundles `tino` as PID 1 plus `salus` and
-`motdyn` as runtime utilities.
+scratch tool image. Every image bundles [`tino`](https://github.com/oksyd/tino)
+as PID 1, [`salus`](https://github.com/oksyd/salus) for health checks, and
+`motdyn` for welcome messages.
 
 ## Flow
 

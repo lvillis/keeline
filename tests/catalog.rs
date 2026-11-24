@@ -69,7 +69,7 @@ fn all_repository_images_declare_runtime_tools() {
             init.image
                 .as_deref()
                 .unwrap()
-                .starts_with("ghcr.io/lvillis/tino:")
+                .starts_with("ghcr.io/oksyd/tino:")
         );
         assert_eq!(init.target_path, "/sbin/tino");
         assert_eq!(init.entrypoint, vec!["/sbin/tino", "-g", "-s", "--"]);
@@ -81,7 +81,7 @@ fn all_repository_images_declare_runtime_tools() {
                 .image
                 .as_deref()
                 .unwrap()
-                .starts_with("ghcr.io/lvillis/salus:")
+                .starts_with("ghcr.io/oksyd/salus:")
         );
         assert_eq!(healthcheck.target_path, "/bin/salus");
 
@@ -179,16 +179,16 @@ platforms = ["linux/amd64"]
 
 [tools.tino]
 role = "init"
-release = "0.1.26"
-image = "ghcr.io/lvillis/tino:0.1.26@sha256:8ad7b87083aee56d97f68c355bf57ad0a55ad5b00508f87dd86e148dcf91374b"
+release = "0.1.39"
+image = "ghcr.io/oksyd/tino:0.1.39@sha256:db6eab0577c7cc22b53cced7ab379df296c7f6f8938e51a7a8efbf5aaf7b6e5d"
 source_path = "/sbin/tino"
 target_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
 [tools.salus]
 role = "healthcheck"
-release = "0.1.8"
-image = "ghcr.io/lvillis/salus:0.1.8@sha256:c8469182df00b34dec2467776c86c22b36b235f3c4f6c93c3fff441f1b3ee568"
+release = "0.1.12"
+image = "ghcr.io/oksyd/salus:0.1.12@sha256:2d84e43cddb11352321b4e0e4ebf726ee4d9f7b9dc88c8102982ea0a74db5d86"
 source_path = "/bin/salus"
 target_path = "/bin/salus"
 

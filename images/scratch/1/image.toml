@@ -10,16 +10,16 @@ platforms = ["linux/amd64", "linux/arm64"]
 
 [tools.tino]
 role = "init"
-release = "0.1.33"
-image = "ghcr.io/lvillis/tino:0.1.33@sha256:2514ba79a1881d8a92337f0ee0f60fabff081fb757543e836af922dbcc7f93b0"
+release = "0.1.40"
+image = "ghcr.io/oksyd/tino:0.1.40@sha256:1604063f14b24f8ee7967eec56dee308fa58de1cf13397d48cbadb06a3de0365"
 source_path = "/sbin/tino"
 target_path = "/sbin/tino"
 entrypoint = ["/sbin/tino", "-g", "-s", "--"]
 
 [tools.salus]
 role = "healthcheck"
-release = "0.1.10"
-image = "ghcr.io/lvillis/salus:0.1.10@sha256:f0a8ed7bfc6a62dfafc3aa25d61c01d7c7eb88b5c20e4f64c76f2d0a0b641045"
+release = "0.1.12"
+image = "ghcr.io/oksyd/salus:0.1.12@sha256:2d84e43cddb11352321b4e0e4ebf726ee4d9f7b9dc88c8102982ea0a74db5d86"
 source_path = "/bin/salus"
 target_path = "/bin/salus"
 

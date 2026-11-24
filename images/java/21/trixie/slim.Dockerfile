@@ -3,9 +3,9 @@
 # SOURCE OF TRUTH: image.toml
 # ------------------------------------------------------------------------------
 
-FROM ghcr.io/lvillis/tino:0.1.33@sha256:2514ba79a1881d8a92337f0ee0f60fabff081fb757543e836af922dbcc7f93b0 AS tino
+FROM ghcr.io/oksyd/tino:0.1.40@sha256:1604063f14b24f8ee7967eec56dee308fa58de1cf13397d48cbadb06a3de0365 AS tino
 
-FROM ghcr.io/lvillis/salus:0.1.10@sha256:f0a8ed7bfc6a62dfafc3aa25d61c01d7c7eb88b5c20e4f64c76f2d0a0b641045 AS salus
+FROM ghcr.io/oksyd/salus:0.1.12@sha256:2d84e43cddb11352321b4e0e4ebf726ee4d9f7b9dc88c8102982ea0a74db5d86 AS salus
 
 FROM ghcr.io/lvillis/motdyn:1.0.14-slim@sha256:68eb88ae6031b08afaade56e04a0497f6139f80445bb6b3d27dc03a294ed1ef6 AS motdyn
 

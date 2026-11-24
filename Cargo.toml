@@ -2,12 +2,11 @@
 name = "keeline"
 version = "0.1.12"
 edition = "2024"
-rust-version = "1.98.0"
+rust-version = "1.100.0"
 description = "Metadata-driven CLI for validating, rendering, and releasing runtime container images."
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/lvillis/keeline"
-homepage = "https://github.com/lvillis/keeline"
 documentation = "https://docs.rs/keeline"
 keywords = ["docker", "ghcr", "oci", "images", "containers"]
 categories = ["command-line-utilities", "development-tools"]
@@ -16,21 +15,20 @@ include = [
     "/Cargo.lock",
     "/LICENSE",
     "/README.md",
-    "/images/**",
     "/src/**",
     "/tests/**",
 ]
 
 [dependencies]
-anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
-clap = { version = "4.6.1", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
-regex = { version = "1.12.3", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.104", default-features = false, features = ["std"] }
+clap = { version = "4.6.8", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
+regex = { version = "1.13.2", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["std"] }
-serde = { version = "1.0.228", default-features = false, features = ["derive", "std"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["std"] }
-toml = { version = "1.1.2", default-features = false, features = ["parse", "serde", "std"] }
-toml_edit = { version = "0.25.11", default-features = false, features = ["display", "parse"] }
-ureq = { version = "3.3.0", default-features = false, features = ["rustls"] }
+serde = { version = "1.0.229", default-features = false, features = ["derive", "std"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["std"] }
+toml = { version = "1.2.1", default-features = false, features = ["parse", "serde", "std"] }
+toml_edit = { version = "0.25.19", default-features = false, features = ["display", "parse"] }
+ureq = { version = "3.5.2", default-features = false, features = ["rustls"] }
 walkdir = { version = "2.5.0", default-features = false }
 
 [lints.rust]
