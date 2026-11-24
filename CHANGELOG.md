@@ -1,8 +1,14 @@
+## [0.1.13] - 2026-11-24
+
+### 🚀 Features
+
+- [**breaking**] Harden tool updates and native image releases
 ## [0.1.12] - 2026-05-19
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(images)* Upgrade bundled runtime tools
+- Release keeline version 0.1.12
 ## [0.1.11] - 2026-05-07
 
 ### 🚀 Features

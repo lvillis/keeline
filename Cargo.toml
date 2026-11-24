@@ -1,6 +1,6 @@
 [package]
 name = "keeline"
-version = "0.1.12"
+version = "0.1.13"
 edition = "2024"
 rust-version = "1.100.0"
 description = "Metadata-driven CLI for validating, rendering, and releasing runtime container images."
